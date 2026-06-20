@@ -1605,7 +1605,7 @@ const Comunicados=({comunicados,setComunicados,isAdmin,vols})=>{
         const confirmar=window.confirm(`Se abrirá Gmail con ${voluntariosCorreo.length} destinatario(s) en copia. ¿Continuar?`);
         if(confirmar){
           const correos=voluntariosCorreo.map(v=>v.correo).join(",");
-          window.open(`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(correos)}&su=${asunto}&body=${cuerpo}`,"_blank");
+          window.open(`https://mail.google.com/mail/?view=cm&bcc=${encodeURIComponent(correos)}&su=${asunto}&body=${cuerpo}`,"_blank");
         }
       }
     }

@@ -2429,6 +2429,7 @@ const ContrasenasSistema=({passMeta,onCambiar})=>{
 
 // ── App ───────────────────────────────────────────────────────────────────────
 const SESSION_KEY="bd_session_v1";
+const SESSION_HOURS=4; // horas antes de que expire la sesión
 
 function applyDriveData(data,{setVols,setConfirm,setComunicados,setActs,setAceptaciones,setDocsPolitica,setActTipos,setTareas,setCentros,setPassAdmin,setPassVoluntario,setPassMeta}){
   if(Array.isArray(data.vols)&&data.vols.length)setVols(data.vols);
@@ -2446,8 +2447,19 @@ function applyDriveData(data,{setVols,setConfirm,setComunicados,setActs,setAcept
 }
 
 function App(){
-  // ── Sesión persistente: recuperar del localStorage si existe ────────────────
-  const savedSession=(()=>{try{const s=localStorage.getItem(SESSION_KEY);return s?JSON.parse(s):null;}catch{return null;}})();
+  // ── Sesión persistente: recuperar de sessionStorage si existe y no expiró ───
+  const savedSession=(()=>{
+    try{
+      const s=sessionStorage.getItem(SESSION_KEY);
+      if(!s)return null;
+      const parsed=JSON.parse(s);
+      // Verificar que no hayan pasado más de SESSION_HOURS horas
+      if(!parsed.loginAt)return null;
+      const elapsed=(Date.now()-parsed.loginAt)/(1000*60*60);
+      if(elapsed>SESSION_HOURS){sessionStorage.removeItem(SESSION_KEY);return null;}
+      return parsed;
+    }catch{return null;}
+  })();
 
   const [auth,setAuth]=useState(savedSession);
   const [page,setPage]=useState("dashboard");
@@ -2554,12 +2566,28 @@ function App(){
     return()=>{if(saveRef.current)clearTimeout(saveRef.current);};
   },[vols,confirm,comunicados,acts,tareas,centros,aceptaciones,docsPolitica,actTipos,passAdmin,passVoluntario,passMeta]);
 
-  // Guardar / borrar sesión en localStorage al cambiar auth
+  // Guardar / borrar sesión en sessionStorage al cambiar auth
   useEffect(()=>{
     try{
-      if(auth)localStorage.setItem(SESSION_KEY,JSON.stringify(auth));
-      else localStorage.removeItem(SESSION_KEY);
+      if(auth)sessionStorage.setItem(SESSION_KEY,JSON.stringify(auth));
+      else sessionStorage.removeItem(SESSION_KEY);
     }catch{}
+  },[auth]);
+
+  // Verificar expiración cada minuto mientras la app está abierta
+  useEffect(()=>{
+    if(!auth)return;
+    const interval=setInterval(()=>{
+      if(!auth?.loginAt)return;
+      const elapsed=(Date.now()-auth.loginAt)/(1000*60*60);
+      if(elapsed>SESSION_HOURS){
+        sessionStorage.removeItem(SESSION_KEY);
+        setAuth(null);
+        setPage("dashboard");
+        alert("Tu sesión ha expirado después de "+SESSION_HOURS+" horas. Por favor inicia sesión de nuevo.");
+      }
+    },60000); // revisar cada minuto
+    return()=>clearInterval(interval);
   },[auth]);
 
   const logout=()=>{setAuth(null);setPage("dashboard");};
@@ -2584,7 +2612,7 @@ function App(){
 
   if (!auth) return <Login passAdmin={passAdmin} passVoluntario={passVoluntario} onLogin={info=>{
     const ficha=info.volId?vols.find(v=>v.id===info.volId):null;
-    const session={...info,nombre:ficha?ficha.nombre:info.nombre};
+    const session={...info,nombre:ficha?ficha.nombre:info.nombre,loginAt:Date.now()};
     setAuth(session);
     setPage("dashboard");
   }} />;

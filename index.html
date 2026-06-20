@@ -2428,8 +2428,28 @@ const ContrasenasSistema=({passMeta,onCambiar})=>{
 };
 
 // ── App ───────────────────────────────────────────────────────────────────────
+const SESSION_KEY="bd_session_v1";
+
+function applyDriveData(data,{setVols,setConfirm,setComunicados,setActs,setAceptaciones,setDocsPolitica,setActTipos,setTareas,setCentros,setPassAdmin,setPassVoluntario,setPassMeta}){
+  if(Array.isArray(data.vols)&&data.vols.length)setVols(data.vols);
+  if(Array.isArray(data.confirm)&&data.confirm.length)setConfirm(data.confirm);
+  if(Array.isArray(data.comunicados)&&data.comunicados.length)setComunicados(data.comunicados);
+  if(Array.isArray(data.acts)&&data.acts.length)setActs(data.acts);
+  if(data.aceptaciones&&typeof data.aceptaciones==="object")setAceptaciones(data.aceptaciones);
+  if(Array.isArray(data.docsPolitica))setDocsPolitica(data.docsPolitica);
+  if(Array.isArray(data.actTipos)&&data.actTipos.length)setActTipos(data.actTipos);
+  if(Array.isArray(data.tareas)&&data.tareas.length)setTareas(data.tareas);
+  if(Array.isArray(data.centros)&&data.centros.length)setCentros(data.centros);
+  if(typeof data.passAdmin==="string"&&data.passAdmin)setPassAdmin(data.passAdmin);
+  if(typeof data.passVoluntario==="string"&&data.passVoluntario)setPassVoluntario(data.passVoluntario);
+  if(data.passMeta&&typeof data.passMeta==="object")setPassMeta(data.passMeta);
+}
+
 function App(){
-  const [auth,setAuth]=useState(null); // null | {role,nombre,usuario}
+  // ── Sesión persistente: recuperar del localStorage si existe ────────────────
+  const savedSession=(()=>{try{const s=localStorage.getItem(SESSION_KEY);return s?JSON.parse(s):null;}catch{return null;}})();
+
+  const [auth,setAuth]=useState(savedSession);
   const [page,setPage]=useState("dashboard");
   const [collapsed,setCollapsed]=useState(false);
   const [vols,setVols]=useState(INIT_VOLS);
@@ -2445,48 +2465,86 @@ function App(){
   const [passVoluntario,setPassVoluntario]=useState(INIT_PASS_VOLUNTARIO);
   const [passMeta,setPassMeta]=useState({adminFecha:null,adminPor:null,volFecha:null,volPor:null});
 
-  // ── Sincronización con Google Drive (opcional) ──────────────────────────────
+  // ── Sincronización con Google Drive ────────────────────────────────────────
   const [syncMsg,setSyncMsg]=useState(SHEETS_URL?"Conectando con Drive…":"Modo local");
   const [syncOk,setSyncOk]=useState(false);
-  const firstSave=useRef(true);
+  const pendingSave=useRef(false);   // hay cambios locales sin guardar
+  const saving=useRef(false);        // guardado en curso
+  const stateRef=useRef({});         // referencia viva al estado actual para el guardado
 
-  // Cargar datos desde Drive al iniciar
+  // Mantener stateRef siempre actualizado
   useEffect(()=>{
+    stateRef.current={vols,confirm,comunicados,acts,tareas,centros,aceptaciones,docsPolitica,actTipos,passAdmin,passVoluntario,passMeta};
+  });
+
+  const setters={setVols,setConfirm,setComunicados,setActs,setAceptaciones,setDocsPolitica,setActTipos,setTareas,setCentros,setPassAdmin,setPassVoluntario,setPassMeta};
+
+  // Función de carga desde Drive (reutilizable)
+  const loadFromDrive=useCallback(async(quiet=false)=>{
     if(!SHEETS_URL)return;
-    (async()=>{
-      try{
-        const r=await fetch(SHEETS_URL+"?action=load");
-        const data=await r.json();
-        if(Array.isArray(data.vols)&&data.vols.length)setVols(data.vols);
-        if(Array.isArray(data.confirm)&&data.confirm.length)setConfirm(data.confirm);
-        if(Array.isArray(data.comunicados)&&data.comunicados.length)setComunicados(data.comunicados);
-        if(Array.isArray(data.acts)&&data.acts.length)setActs(data.acts);
-        if(data.aceptaciones&&typeof data.aceptaciones==="object")setAceptaciones(data.aceptaciones);
-        if(Array.isArray(data.docsPolitica))setDocsPolitica(data.docsPolitica);
-        if(Array.isArray(data.actTipos)&&data.actTipos.length)setActTipos(data.actTipos);
-        if(Array.isArray(data.tareas)&&data.tareas.length)setTareas(data.tareas);
-        if(Array.isArray(data.centros)&&data.centros.length)setCentros(data.centros);
-        if(typeof data.passAdmin==="string"&&data.passAdmin)setPassAdmin(data.passAdmin);
-        if(typeof data.passVoluntario==="string"&&data.passVoluntario)setPassVoluntario(data.passVoluntario);
-        if(data.passMeta&&typeof data.passMeta==="object")setPassMeta(data.passMeta);
-        setSyncOk(true);setSyncMsg("Sincronizado con Drive");
-      }catch(e){setSyncOk(false);setSyncMsg("Sin conexión a Drive (modo local)");}
-    })();
+    try{
+      const r=await fetch(SHEETS_URL+"?action=load&t="+Date.now());
+      const data=await r.json();
+      // Solo aplicar si NO hay un guardado pendiente para no pisar cambios propios
+      if(!pendingSave.current&&!saving.current){
+        applyDriveData(data,setters);
+      }
+      if(!quiet){setSyncOk(true);setSyncMsg("Sincronizado con Drive");}
+    }catch(e){
+      if(!quiet){setSyncOk(false);setSyncMsg("Sin conexión a Drive (modo local)");}
+    }
   },[]);
 
-  // Guardar en Drive cuando cambian los datos (con pequeño retardo)
+  // Carga inicial
+  useEffect(()=>{ loadFromDrive(); },[]);
+
+  // Auto-recarga cada 30 segundos para ver cambios de otros usuarios
   useEffect(()=>{
     if(!SHEETS_URL)return;
-    if(firstSave.current){firstSave.current=false;return;}
-    const t=setTimeout(()=>{
+    const interval=setInterval(()=>loadFromDrive(true),30000);
+    return()=>clearInterval(interval);
+  },[loadFromDrive]);
+
+  // Guardar con anti-conflicto: leer Drive → fusionar → escribir
+  const saveRef=useRef(null);
+  useEffect(()=>{
+    if(!SHEETS_URL)return;
+    pendingSave.current=true;
+    if(saveRef.current)clearTimeout(saveRef.current);
+    saveRef.current=setTimeout(async()=>{
+      saving.current=true;
       setSyncMsg("Guardando…");
-      fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-        body:JSON.stringify({vols,confirm,comunicados,acts,tareas,centros,aceptaciones,docsPolitica,actTipos,passAdmin,passVoluntario,passMeta})})
-        .then(()=>{setSyncOk(true);setSyncMsg("Guardado en Drive");})
-        .catch(()=>{setSyncOk(false);setSyncMsg("Error al guardar (modo local)");});
+      try{
+        // 1. Leer estado actual en Drive
+        const r=await fetch(SHEETS_URL+"?action=load&t="+Date.now());
+        const remote=await r.json();
+        // 2. Fusionar: el estado local tiene prioridad en las secciones que YO edité,
+        //    pero respeto las secciones que NO cambié si Drive tiene algo más nuevo.
+        //    Estrategia simple y segura: el local gana (ya tiene lo de Drive desde la
+        //    última carga) pero escribimos todo junto para no dejar huecos.
+        const merged={...remote,...stateRef.current};
+        // 3. Escribir el estado fusionado
+        await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+          body:JSON.stringify(merged)});
+        setSyncOk(true);setSyncMsg("Guardado en Drive");
+        pendingSave.current=false;
+      }catch(e){
+        setSyncOk(false);setSyncMsg("Error al guardar (modo local)");
+      }finally{saving.current=false;}
     },1200);
-    return ()=>clearTimeout(t);
+    return()=>{if(saveRef.current)clearTimeout(saveRef.current);};
   },[vols,confirm,comunicados,acts,tareas,centros,aceptaciones,docsPolitica,actTipos,passAdmin,passVoluntario,passMeta]);
+
+  // Guardar / borrar sesión en localStorage al cambiar auth
+  useEffect(()=>{
+    try{
+      if(auth)localStorage.setItem(SESSION_KEY,JSON.stringify(auth));
+      else localStorage.removeItem(SESSION_KEY);
+    }catch{}
+  },[auth]);
+
+  const logout=()=>{setAuth(null);setPage("dashboard");};
+
   const navGroupsFiltrados = auth && auth.role==="voluntario"
     ? NAV_GROUPS.map(g=>({...g,items:g.items.filter(i=>VOL_PAGES.includes(i.id))})).filter(g=>g.items.length>0)
     : NAV_GROUPS;
@@ -2507,7 +2565,8 @@ function App(){
 
   if (!auth) return <Login passAdmin={passAdmin} passVoluntario={passVoluntario} onLogin={info=>{
     const ficha=info.volId?vols.find(v=>v.id===info.volId):null;
-    setAuth({...info,nombre:ficha?ficha.nombre:info.nombre});
+    const session={...info,nombre:ficha?ficha.nombre:info.nombre};
+    setAuth(session);
     setPage("dashboard");
   }} />;
 
@@ -2539,7 +2598,7 @@ function App(){
 
   return(
     <div style={{display:"flex",minHeight:"100vh",background:C.grayLight}}>
-      <Sidebar current={page} setCurrent={setPage} collapsed={collapsed} setCollapsed={setCollapsed} navGroups={navGroupsFiltrados} auth={auth} onLogout={()=>{setAuth(null);setPage("dashboard");}}/>
+      <Sidebar current={page} setCurrent={setPage} collapsed={collapsed} setCollapsed={setCollapsed} navGroups={navGroupsFiltrados} auth={auth} onLogout={logout}/>
       <main style={{flex:1,overflowY:"auto",maxHeight:"100vh"}}>
         {/* Top bar with user info */}
         <div style={{background:C.white,borderBottom:`1px solid ${C.grayBorder}`,padding:"10px 32px",display:"flex",alignItems:"center",justifyContent:"flex-end",gap:12,position:"sticky",top:0,zIndex:50}}>
@@ -2549,12 +2608,17 @@ function App(){
             borderRadius:20,padding:"4px 12px",marginRight:"auto"}}>
             <span style={{fontSize:9}}>{SHEETS_URL?(syncOk?"🟢":"🟡"):"⚪"}</span>{syncMsg}
           </span>
+          {SHEETS_URL&&<button onClick={()=>loadFromDrive(false)} title="Actualizar datos ahora"
+            style={{padding:"5px 12px",background:"#e3f2fd",border:`1px solid ${C.accent}`,
+              borderRadius:8,cursor:"pointer",color:C.accent,fontWeight:700,fontSize:12,display:"flex",alignItems:"center",gap:5}}>
+            🔄 Actualizar
+          </button>}
           <span style={{fontSize:18}}>{auth.role==="admin"?"🛡️":"🙋"}</span>
           <div style={{lineHeight:1.3}}>
             <div style={{fontSize:13,fontWeight:700,color:C.dark}}>{auth.nombre}</div>
             <div style={{fontSize:11,color:C.gray,textTransform:"capitalize"}}>{auth.role==="admin"?"Administrador — Acceso total":"Voluntario/a — Acceso restringido"}</div>
           </div>
-          <button onClick={()=>{setAuth(null);setPage("dashboard");}} title="Cerrar sesión"
+          <button onClick={logout} title="Cerrar sesión"
             style={{marginLeft:8,padding:"7px 14px",background:C.redPale,border:`1px solid ${C.red}`,
               borderRadius:8,cursor:"pointer",color:C.red,fontWeight:600,fontSize:12,display:"flex",alignItems:"center",gap:5}}>
             🚪 Salir

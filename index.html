@@ -99,115 +99,36 @@ function periodoActual(){
   for(let i=0;i<PASS_SCHEDULE.length;i++){ if(PASS_SCHEDULE[i].desde<=hoy) cur=PASS_SCHEDULE[i]; }
   return cur;
 }
+// SEGURIDAD (v7): a partir de esta versión, las contraseñas YA NO dependen de un
+// calendario fijo en el código. El administrador puede cambiarlas cuando lo
+// necesite desde el apartado "Contraseñas del Sistema" (solo visible para
+// administradores). Al cargar por primera vez, se usan como valores iniciales
+// las huellas del periodo vigente del calendario anterior, para no romper el
+// acceso de quienes ya tienen una contraseña entregada. Desde ahí en adelante,
+// los cambios se guardan en el estado de la app (y se sincronizan con Drive si
+// está configurado).
+const INIT_PASS_ADMIN = periodoActual().admin;
+const INIT_PASS_VOLUNTARIO = periodoActual().voluntario;
 
-// Directorio de cuentas (sin contraseñas). El voluntario lleva volId para vincularse
-// con su ficha en INIT_VOLS. La contraseña se valida según el rol.
+// Directorio de cuentas administrativas (sin contraseñas).
+// Las cuentas de voluntarios (vol0001–vol9999) se generan dinámicamente en el login.
 const CRED={
   admin:{role:"admin",nombre:"Administración"},
   coordinacion:{role:"admin",nombre:"Coordinación"},
   direccion:{role:"admin",nombre:"Dirección"},
   voluntariado:{role:"admin",nombre:"Gestión de Voluntariado"},
-  vol001:{role:"voluntario",nombre:"Voluntario/a 001",volId:1},
-  vol002:{role:"voluntario",nombre:"Voluntario/a 002",volId:2},
-  vol003:{role:"voluntario",nombre:"Voluntario/a 003",volId:3},
-  vol004:{role:"voluntario",nombre:"Voluntario/a 004",volId:4},
-  vol005:{role:"voluntario",nombre:"Voluntario/a 005",volId:5},
-  vol006:{role:"voluntario",nombre:"Voluntario/a 006",volId:6},
-  vol007:{role:"voluntario",nombre:"Voluntario/a 007",volId:7},
-  vol008:{role:"voluntario",nombre:"Voluntario/a 008",volId:8},
-  vol009:{role:"voluntario",nombre:"Voluntario/a 009",volId:9},
-  vol010:{role:"voluntario",nombre:"Voluntario/a 010",volId:10},
-  vol011:{role:"voluntario",nombre:"Voluntario/a 011",volId:11},
-  vol012:{role:"voluntario",nombre:"Voluntario/a 012",volId:12},
-  vol013:{role:"voluntario",nombre:"Voluntario/a 013",volId:13},
-  vol014:{role:"voluntario",nombre:"Voluntario/a 014",volId:14},
-  vol015:{role:"voluntario",nombre:"Voluntario/a 015",volId:15},
-  vol016:{role:"voluntario",nombre:"Voluntario/a 016",volId:16},
-  vol017:{role:"voluntario",nombre:"Voluntario/a 017",volId:17},
-  vol018:{role:"voluntario",nombre:"Voluntario/a 018",volId:18},
-  vol019:{role:"voluntario",nombre:"Voluntario/a 019",volId:19},
-  vol020:{role:"voluntario",nombre:"Voluntario/a 020",volId:20},
-  vol021:{role:"voluntario",nombre:"Voluntario/a 021",volId:21},
-  vol022:{role:"voluntario",nombre:"Voluntario/a 022",volId:22},
-  vol023:{role:"voluntario",nombre:"Voluntario/a 023",volId:23},
-  vol024:{role:"voluntario",nombre:"Voluntario/a 024",volId:24},
-  vol025:{role:"voluntario",nombre:"Voluntario/a 025",volId:25},
-  vol026:{role:"voluntario",nombre:"Voluntario/a 026",volId:26},
-  vol027:{role:"voluntario",nombre:"Voluntario/a 027",volId:27},
-  vol028:{role:"voluntario",nombre:"Voluntario/a 028",volId:28},
-  vol029:{role:"voluntario",nombre:"Voluntario/a 029",volId:29},
-  vol030:{role:"voluntario",nombre:"Voluntario/a 030",volId:30},
-  vol031:{role:"voluntario",nombre:"Voluntario/a 031",volId:31},
-  vol032:{role:"voluntario",nombre:"Voluntario/a 032",volId:32},
-  vol033:{role:"voluntario",nombre:"Voluntario/a 033",volId:33},
-  vol034:{role:"voluntario",nombre:"Voluntario/a 034",volId:34},
-  vol035:{role:"voluntario",nombre:"Voluntario/a 035",volId:35},
-  vol036:{role:"voluntario",nombre:"Voluntario/a 036",volId:36},
-  vol037:{role:"voluntario",nombre:"Voluntario/a 037",volId:37},
-  vol038:{role:"voluntario",nombre:"Voluntario/a 038",volId:38},
-  vol039:{role:"voluntario",nombre:"Voluntario/a 039",volId:39},
-  vol040:{role:"voluntario",nombre:"Voluntario/a 040",volId:40},
-  vol041:{role:"voluntario",nombre:"Voluntario/a 041",volId:41},
-  vol042:{role:"voluntario",nombre:"Voluntario/a 042",volId:42},
-  vol043:{role:"voluntario",nombre:"Voluntario/a 043",volId:43},
-  vol044:{role:"voluntario",nombre:"Voluntario/a 044",volId:44},
-  vol045:{role:"voluntario",nombre:"Voluntario/a 045",volId:45},
-  vol046:{role:"voluntario",nombre:"Voluntario/a 046",volId:46},
-  vol047:{role:"voluntario",nombre:"Voluntario/a 047",volId:47},
-  vol048:{role:"voluntario",nombre:"Voluntario/a 048",volId:48},
-  vol049:{role:"voluntario",nombre:"Voluntario/a 049",volId:49},
-  vol050:{role:"voluntario",nombre:"Voluntario/a 050",volId:50},
-  vol051:{role:"voluntario",nombre:"Voluntario/a 051",volId:51},
-  vol052:{role:"voluntario",nombre:"Voluntario/a 052",volId:52},
-  vol053:{role:"voluntario",nombre:"Voluntario/a 053",volId:53},
-  vol054:{role:"voluntario",nombre:"Voluntario/a 054",volId:54},
-  vol055:{role:"voluntario",nombre:"Voluntario/a 055",volId:55},
-  vol056:{role:"voluntario",nombre:"Voluntario/a 056",volId:56},
-  vol057:{role:"voluntario",nombre:"Voluntario/a 057",volId:57},
-  vol058:{role:"voluntario",nombre:"Voluntario/a 058",volId:58},
-  vol059:{role:"voluntario",nombre:"Voluntario/a 059",volId:59},
-  vol060:{role:"voluntario",nombre:"Voluntario/a 060",volId:60},
-  vol061:{role:"voluntario",nombre:"Voluntario/a 061",volId:61},
-  vol062:{role:"voluntario",nombre:"Voluntario/a 062",volId:62},
-  vol063:{role:"voluntario",nombre:"Voluntario/a 063",volId:63},
-  vol064:{role:"voluntario",nombre:"Voluntario/a 064",volId:64},
-  vol065:{role:"voluntario",nombre:"Voluntario/a 065",volId:65},
-  vol066:{role:"voluntario",nombre:"Voluntario/a 066",volId:66},
-  vol067:{role:"voluntario",nombre:"Voluntario/a 067",volId:67},
-  vol068:{role:"voluntario",nombre:"Voluntario/a 068",volId:68},
-  vol069:{role:"voluntario",nombre:"Voluntario/a 069",volId:69},
-  vol070:{role:"voluntario",nombre:"Voluntario/a 070",volId:70},
-  vol071:{role:"voluntario",nombre:"Voluntario/a 071",volId:71},
-  vol072:{role:"voluntario",nombre:"Voluntario/a 072",volId:72},
-  vol073:{role:"voluntario",nombre:"Voluntario/a 073",volId:73},
-  vol074:{role:"voluntario",nombre:"Voluntario/a 074",volId:74},
-  vol075:{role:"voluntario",nombre:"Voluntario/a 075",volId:75},
-  vol076:{role:"voluntario",nombre:"Voluntario/a 076",volId:76},
-  vol077:{role:"voluntario",nombre:"Voluntario/a 077",volId:77},
-  vol078:{role:"voluntario",nombre:"Voluntario/a 078",volId:78},
-  vol079:{role:"voluntario",nombre:"Voluntario/a 079",volId:79},
-  vol080:{role:"voluntario",nombre:"Voluntario/a 080",volId:80},
-  vol081:{role:"voluntario",nombre:"Voluntario/a 081",volId:81},
-  vol082:{role:"voluntario",nombre:"Voluntario/a 082",volId:82},
-  vol083:{role:"voluntario",nombre:"Voluntario/a 083",volId:83},
-  vol084:{role:"voluntario",nombre:"Voluntario/a 084",volId:84},
-  vol085:{role:"voluntario",nombre:"Voluntario/a 085",volId:85},
-  vol086:{role:"voluntario",nombre:"Voluntario/a 086",volId:86},
-  vol087:{role:"voluntario",nombre:"Voluntario/a 087",volId:87},
-  vol088:{role:"voluntario",nombre:"Voluntario/a 088",volId:88},
-  vol089:{role:"voluntario",nombre:"Voluntario/a 089",volId:89},
-  vol090:{role:"voluntario",nombre:"Voluntario/a 090",volId:90},
-  vol091:{role:"voluntario",nombre:"Voluntario/a 091",volId:91},
-  vol092:{role:"voluntario",nombre:"Voluntario/a 092",volId:92},
-  vol093:{role:"voluntario",nombre:"Voluntario/a 093",volId:93},
-  vol094:{role:"voluntario",nombre:"Voluntario/a 094",volId:94},
-  vol095:{role:"voluntario",nombre:"Voluntario/a 095",volId:95},
-  vol096:{role:"voluntario",nombre:"Voluntario/a 096",volId:96},
-  vol097:{role:"voluntario",nombre:"Voluntario/a 097",volId:97},
-  vol098:{role:"voluntario",nombre:"Voluntario/a 098",volId:98},
-  vol099:{role:"voluntario",nombre:"Voluntario/a 099",volId:99},
-  vol100:{role:"voluntario",nombre:"Voluntario/a 100",volId:100}
 };
+// Resuelve una cuenta de voluntario dinámicamente si sigue el patrón volXXXX
+function resolverCred(key){
+  if(CRED[key]) return CRED[key];
+  // Acepta vol001–vol999 (3 dígitos, legado) y vol0001–vol9999 (4 dígitos, nuevo)
+  const m=key.match(/^vol0*(\d+)$/);
+  if(m){
+    const num=parseInt(m[1],10);
+    if(num>=1&&num<=9999) return{role:"voluntario",nombre:`Voluntario/a ${String(num).padStart(4,"0")}`,volId:num};
+  }
+  return null;
+}
 // Apartados visibles para voluntarios (los administradores ven todo)
 const VOL_PAGES = ["dashboard","calendario","comunicados","confirmacion","actividades","tareas","proyectos","politica"];
 
@@ -300,11 +221,11 @@ const CENTRO_IMG={
 
 // ── Sample Data ──────────────────────────────────────────────────────────────
 const INIT_VOLS=[
-  {id:1,volUsuario:"vol001",nombre:"Ana Rojas",edad:25,telefono:"75012345",correo:"ana.rojas@gmail.com",area:"Educación",rol:"Educador",tipo:"nacional",areaEstudio:"Pedagogía",disponibilidad:["Lunes","Miércoles","Viernes"],bloques:["manana","tarde"],activo:true,horasSemana:6,horasAcumuladas:24,faltas:0,ubicaciones:["Nuestra Señora de la Salette","Mercado Campesino de Arocagua"],proyectoPref:"Nuestra Señora de la Salette",comentarios:"Voluntaria con experiencia en talleres educativos."},
-  {id:2,volUsuario:"vol002",nombre:"Luis Mamani",edad:30,telefono:"72345678",correo:"luis.mamani@gmail.com",area:"Logística",rol:"Apoyo",tipo:"nacional",areaEstudio:"Administración",disponibilidad:["Martes","Jueves"],bloques:["mediodia"],activo:true,horasSemana:4,horasAcumuladas:16,faltas:1,ubicaciones:["Mercado Campesino de Arocagua","Sede Principal"],proyectoPref:"Mercado Campesino de Arocagua",comentarios:""},
-  {id:3,volUsuario:"vol003",nombre:"María Flores",edad:22,telefono:"71234567",correo:"maria.flores@gmail.com",area:"Comunicación",rol:"Auxiliar",tipo:"nacional",areaEstudio:"Comunicación Social",disponibilidad:["Lunes","Sábado"],bloques:["tarde"],activo:false,horasSemana:0,horasAcumuladas:8,faltas:3,ubicaciones:[],proyectoPref:"",comentarios:"Disponible solo fines de semana."},
-  {id:4,volUsuario:"vol004",nombre:"Carlos Quispe",edad:28,telefono:"76543210",correo:"carlos.quispe@gmail.com",area:"Salud",rol:"Responsable",tipo:"nacional",areaEstudio:"Enfermería",disponibilidad:["Miércoles","Sábado"],bloques:["manana","tarde"],activo:true,horasSemana:8,horasAcumuladas:40,faltas:0,ubicaciones:["Hospital de Niños","Papa Francisco Uspha Uspha"],proyectoPref:"Hospital de Niños",comentarios:"Técnico en enfermería."},
-  {id:5,volUsuario:"vol005",nombre:"Jean Pierre Dubois",edad:24,telefono:"66554433",correo:"jean.dubois@gmail.com",area:"Arte",rol:"Apoyo",tipo:"internacional",areaEstudio:"Trabajo Social",disponibilidad:["Lunes","Martes","Miércoles","Jueves","Viernes"],bloques:["manana","mediodia","tarde"],activo:true,horasSemana:12,horasAcumuladas:48,faltas:0,ubicaciones:["Vicente Cañas Valle Hermoso"],proyectoPref:"Vicente Cañas Valle Hermoso",comentarios:"Voluntario internacional de Francia, estancia de 6 meses."},
+  {id:1,volUsuario:"vol0001",nombre:"Ana Rojas",edad:25,telefono:"75012345",correo:"ana.rojas@gmail.com",area:"Educación",rol:"Educador",tipo:"nacional",areaEstudio:"Pedagogía",disponibilidad:["Lunes","Miércoles","Viernes"],bloques:["manana","tarde"],activo:true,horasSemana:6,horasAcumuladas:24,faltas:0,ubicaciones:["Nuestra Señora de la Salette","Mercado Campesino de Arocagua"],proyectoPref:"Nuestra Señora de la Salette",comentarios:"Voluntaria con experiencia en talleres educativos."},
+  {id:2,volUsuario:"vol0002",nombre:"Luis Mamani",edad:30,telefono:"72345678",correo:"luis.mamani@gmail.com",area:"Logística",rol:"Apoyo",tipo:"nacional",areaEstudio:"Administración",disponibilidad:["Martes","Jueves"],bloques:["mediodia"],activo:true,horasSemana:4,horasAcumuladas:16,faltas:1,ubicaciones:["Mercado Campesino de Arocagua","Sede Principal"],proyectoPref:"Mercado Campesino de Arocagua",comentarios:""},
+  {id:3,volUsuario:"vol0003",nombre:"María Flores",edad:22,telefono:"71234567",correo:"maria.flores@gmail.com",area:"Comunicación",rol:"Auxiliar",tipo:"nacional",areaEstudio:"Comunicación Social",disponibilidad:["Lunes","Sábado"],bloques:["tarde"],activo:false,horasSemana:0,horasAcumuladas:8,faltas:3,ubicaciones:[],proyectoPref:"",comentarios:"Disponible solo fines de semana."},
+  {id:4,volUsuario:"vol0004",nombre:"Carlos Quispe",edad:28,telefono:"76543210",correo:"carlos.quispe@gmail.com",area:"Salud",rol:"Responsable",tipo:"nacional",areaEstudio:"Enfermería",disponibilidad:["Miércoles","Sábado"],bloques:["manana","tarde"],activo:true,horasSemana:8,horasAcumuladas:40,faltas:0,ubicaciones:["Hospital de Niños","Papa Francisco Uspha Uspha"],proyectoPref:"Hospital de Niños",comentarios:"Técnico en enfermería."},
+  {id:5,volUsuario:"vol0005",nombre:"Jean Pierre Dubois",edad:24,telefono:"66554433",correo:"jean.dubois@gmail.com",area:"Arte",rol:"Apoyo",tipo:"internacional",areaEstudio:"Trabajo Social",disponibilidad:["Lunes","Martes","Miércoles","Jueves","Viernes"],bloques:["manana","mediodia","tarde"],activo:true,horasSemana:12,horasAcumuladas:48,faltas:0,ubicaciones:["Vicente Cañas Valle Hermoso"],proyectoPref:"Vicente Cañas Valle Hermoso",comentarios:"Voluntario internacional de Francia, estancia de 6 meses."},
 ];
 // ── Centros / Proyectos ───────────────────────────────────────────────────────
 const INIT_CENTROS=[
@@ -463,11 +384,14 @@ const NAV_GROUPS=[
   {grupo:"Normativa",items:[
     {id:"politica",label:"Política de Protección",icon:"🛡️"},
   ]},
+  {grupo:"Administración",items:[
+    {id:"passwords",label:"Contraseñas del Sistema",icon:"🔑"},
+  ]},
 ];
 
 
 // ── Login ─────────────────────────────────────────────────────────────────────
-const Login = ({ onLogin }) => {
+const Login = ({ onLogin, passAdmin, passVoluntario }) => {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [modo, setModo] = useState("admin"); // "admin" | "voluntario"
@@ -484,11 +408,10 @@ const Login = ({ onLogin }) => {
     setLoading(true);
     setTimeout(() => {
       const key = usuario.trim().toLowerCase();
-      const cred = CRED[key];
+      const cred = resolverCred(key);
       if (!cred) { setError("Usuario no encontrado."); setLoading(false); return; }
       if (cred.role !== modo) { setError("Este usuario no tiene acceso a ese perfil."); setLoading(false); return; }
-      const per = periodoActual();
-      const objetivo = cred.role==="admin" ? per.admin : per.voluntario;
+      const objetivo = cred.role==="admin" ? passAdmin : passVoluntario;
       if (sha256(password) !== objetivo) { setError("Contraseña incorrecta."); setLoading(false); return; }
       onLogin({ role: cred.role, nombre: cred.nombre, usuario: key, volId: cred.volId });
     }, 400);
@@ -582,8 +505,8 @@ const Login = ({ onLogin }) => {
             <div style={{fontSize:11.5,color:C.gray,lineHeight:1.7}}>
               {modo==="admin"
                 ? "Las 4 cuentas de administración comparten una misma contraseña; tu usuario es admin, coordinacion, direccion o voluntariado."
-                : "Los 100 voluntarios usan su propio usuario (vol001 – vol100) y comparten una misma contraseña."}
-              {" "}La contraseña se renueva cada 6 meses (periodo vigente: {periodoActual().etiqueta}) y coordinación la entrega de forma personal.
+                : "Los voluntarios usan su propio usuario (vol0001 – vol9999) y comparten una misma contraseña."}
+              {" "}La contraseña la define el administrador y se renueva cuando coordinación lo determine necesario, entregándola de forma personal.
               Solo se guarda su huella cifrada (SHA-256), nunca la contraseña.
             </div>
           </div>
@@ -774,8 +697,8 @@ const Dashboard=({vols,acts,tareas,comunicados,setPage})=>{
   );
 };
 const emptyVol={nombre:"",edad:"",telefono:"",correo:"",area:"Educación",rol:"Apoyo",tipo:"nacional",areaEstudio:"",disponibilidad:[],bloques:[],activo:true,horasSemana:0,horasAcumuladas:0,faltas:0,ubicaciones:[],proyectoPref:"",comentarios:"",volUsuario:""};
-// Genera lista de opciones vol001–vol100 para el selector
-const VOL_USUARIO_OPTS=[{value:"",label:"— Sin cuenta asignada —"},...Array.from({length:100},(_,i)=>{const n=String(i+1).padStart(3,"0");return{value:`vol${n}`,label:`vol${n}`};})];
+// Genera lista de opciones vol0001–vol9999 para el selector (10 000 cuentas)
+const ALL_VOL_USUARIOS=Array.from({length:9999},(_,i)=>{const n=String(i+1).padStart(4,"0");return`vol${n}`;});
 
 
 const Voluntarios=({vols,setVols})=>{
@@ -788,19 +711,31 @@ const Voluntarios=({vols,setVols})=>{
 
   const openNew=()=>{setForm(emptyVol);setEditId(null);setModal(true);};
   const openEdit=v=>{setForm({...emptyVol,...v});setEditId(v.id);setModal(true);};
+
+  // Cuentas ya usadas por OTROS voluntarios (excluye al que se está editando)
+  const usadas=new Set(vols.filter(v=>v.volUsuario&&v.id!==editId).map(v=>v.volUsuario));
+  // Opciones del selector: solo muestra las libres + la que ya tiene el voluntario actual
+  const volUsuarioOpts=[
+    {value:"",label:"— Sin cuenta asignada —"},
+    ...ALL_VOL_USUARIOS
+      .filter(u=>!usadas.has(u)||(editId&&form.volUsuario===u))
+      .map(u=>({value:u,label:u}))
+  ];
+
   const save=()=>{
     if(!form.nombre.trim())return;
-    // Regla: 3 o más faltas → inactivo automáticamente
+    // Bloquear si la cuenta ya está usada por otro voluntario
+    if(form.volUsuario){
+      const dupl=vols.find(v=>v.volUsuario===form.volUsuario&&v.id!==editId);
+      if(dupl){window.alert(`La cuenta ${form.volUsuario} ya está asignada a "${dupl.nombre}". Por favor elige otra.`);return;}
+    }
     const faltas=Number(form.faltas)||0;
     const activo=faltas>=3?false:form.activo;
-    // Si tiene volUsuario asignado, el id debe coincidir con el número (vol042 → id:42)
-    // para que el login lo vincule correctamente.
+    // El id debe coincidir con el número de la cuenta para que el login funcione
     let assignedId=editId;
     if(!editId){
       if(form.volUsuario){
         const num=parseInt(form.volUsuario.replace("vol",""),10);
-        // Verificar que ese id no esté ya en uso por otro voluntario
-        if(vols.find(v=>v.id===num)){window.alert(`El usuario ${form.volUsuario} ya está asignado a otro voluntario. Por favor elige otro.`);return;}
         assignedId=num;
       } else {
         assignedId=uid();
@@ -923,9 +858,9 @@ const Voluntarios=({vols,setVols})=>{
           </div>
           <Input label="Correo electrónico" value={form.correo} onChange={v=>setForm({...form,correo:v})} type="email" placeholder="correo@ejemplo.com"/>
           <div style={{marginBottom:16}}>
-            <Select label="🔑 Usuario del sistema (cuenta de acceso)" value={form.volUsuario||""} onChange={v=>setForm({...form,volUsuario:v})} options={VOL_USUARIO_OPTS}/>
+            <Select label="🔑 Usuario del sistema (cuenta de acceso)" value={form.volUsuario||""} onChange={v=>setForm({...form,volUsuario:v})} options={volUsuarioOpts}/>
             <div style={{fontSize:11,color:C.gray,marginTop:-8,marginBottom:4,lineHeight:1.6}}>
-              Asigna el usuario con el que esta persona iniciará sesión. La contraseña la entrega coordinación (ver documento de credenciales).
+              Solo aparecen las cuentas disponibles (vol0001–vol9999). Una vez asignada a un voluntario no se puede asignar a otro.
               {form.volUsuario&&<span style={{marginLeft:6,fontWeight:700,color:C.accent}}>→ Usuario: <b>{form.volUsuario}</b> · Contraseña vigente: Girasol-798</span>}
             </div>
           </div>
@@ -2386,6 +2321,112 @@ const Directorio=({vols,setPage,isAdmin})=>{
   );
 };
 
+// ── Contraseñas del Sistema (solo administradores) ──────────────────────────────
+// Permite al administrador definir/cambiar la contraseña compartida de
+// administradores y la contraseña compartida de voluntarios. Solo se guarda
+// la huella SHA-256 de cada contraseña (nunca el texto plano), igual que en
+// el resto del sistema.
+const ContrasenasSistema=({passMeta,onCambiar})=>{
+  const [formAdmin,setFormAdmin]=useState({nueva:"",confirmar:""});
+  const [formVol,setFormVol]=useState({nueva:"",confirmar:""});
+  const [showAdmin,setShowAdmin]=useState(false);
+  const [showVol,setShowVol]=useState(false);
+  const [okMsg,setOkMsg]=useState("");
+
+  const fmt=iso=>{
+    if(!iso)return "Sin registro de cambios todavía";
+    const d=new Date(iso);
+    return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()} · ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  };
+
+  const validar=(form)=>{
+    if(form.nueva.trim().length<6) return "La contraseña debe tener al menos 6 caracteres.";
+    if(form.nueva!==form.confirmar) return "Las dos contraseñas no coinciden.";
+    return "";
+  };
+
+  const guardar=(tipo,form,setForm,setShow)=>{
+    const err=validar(form);
+    if(err){ window.alert(err); return; }
+    if(!window.confirm(`¿Confirmas el cambio de contraseña de ${tipo==="admin"?"Administradores":"Voluntarios"}? Todas las cuentas de este perfil usarán la nueva contraseña de inmediato.`)) return;
+    onCambiar(tipo, form.nueva);
+    setForm({nueva:"",confirmar:""});
+    setShow(false);
+    setOkMsg(`Contraseña de ${tipo==="admin"?"Administradores":"Voluntarios"} actualizada correctamente.`);
+    setTimeout(()=>setOkMsg(""),4000);
+  };
+
+  const Bloque=({titulo,icon,color,fecha,por,form,setForm,show,setShow,tipo,placeholder}) => (
+    <Card style={{borderTop:`4px solid ${color}`}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+        <span style={{fontSize:24}}>{icon}</span>
+        <h3 style={{margin:0,fontSize:16,fontWeight:800,color:C.dark}}>{titulo}</h3>
+      </div>
+      <div style={{fontSize:12.5,color:C.gray,marginBottom:16,lineHeight:1.6}}>
+        Último cambio: <b>{fmt(fecha)}</b>{por?` · realizado por ${por}`:""}.
+        Esta contraseña es compartida por todas las cuentas de este perfil.
+      </div>
+
+      <div style={{marginBottom:14,position:"relative"}}>
+        <label style={{fontSize:13,fontWeight:700,color:C.dark,display:"block",marginBottom:6}}>Nueva contraseña</label>
+        <input value={form.nueva} onChange={e=>setForm({...form,nueva:e.target.value})}
+          type={show?"text":"password"} placeholder={placeholder}
+          style={{width:"100%",border:`1.5px solid ${C.grayBorder}`,borderRadius:10,padding:"10px 42px 10px 14px",
+            fontSize:14,outline:"none",boxSizing:"border-box",color:C.dark}}/>
+        <button type="button" onClick={()=>setShow(!show)}
+          style={{position:"absolute",right:10,top:33,background:"none",border:"none",cursor:"pointer",fontSize:15,color:C.gray}}>
+          {show?"🙈":"👁️"}
+        </button>
+      </div>
+
+      <Input label="Confirmar nueva contraseña" value={form.confirmar} type={show?"text":"password"}
+        onChange={v=>setForm({...form,confirmar:v})} placeholder={placeholder}/>
+
+      <Btn full color={color} onClick={()=>guardar(tipo,form,setForm,setShow)}>
+        🔒 Guardar nueva contraseña de {tipo==="admin"?"Administradores":"Voluntarios"}
+      </Btn>
+    </Card>
+  );
+
+  return (
+    <div>
+      <div style={{marginBottom:24}}>
+        <h1 style={{margin:0,fontSize:24,fontWeight:800,color:C.dark}}>🔑 Contraseñas del Sistema</h1>
+        <p style={{margin:"4px 0 0",color:C.gray,fontSize:14}}>Solo visible para administradores · Define aquí las contraseñas compartidas de acceso</p>
+      </div>
+
+      <Card style={{marginBottom:18,background:"#f0f8ff",border:`1px solid ${C.grayBorder}`}}>
+        <div style={{fontSize:13,color:C.subHeader,lineHeight:1.7}}>
+          ℹ️ El sistema usa <b>una contraseña compartida para todas las cuentas de administrador</b> y
+          <b> otra contraseña compartida para todas las cuentas de voluntariado</b>. Aquí puedes
+          establecer una nueva en el momento que lo consideres necesario (no hay un periodo fijo:
+          tú decides cuándo cambiarla). Después de guardar, comunica la nueva contraseña de forma
+          personal a quien corresponda. Solo se guarda su huella cifrada (SHA-256); el sistema nunca
+          almacena la contraseña en texto plano.
+        </div>
+      </Card>
+
+      {okMsg&&(
+        <Card style={{marginBottom:18,background:C.greenPale,border:`2px solid ${C.green}`,display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:22}}>✅</span>
+          <div style={{color:C.green,fontWeight:700,fontSize:14}}>{okMsg}</div>
+        </Card>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:18}}>
+        <Bloque titulo="Administradores" icon="🛡️" color={C.primary} tipo="admin"
+          fecha={passMeta.adminFecha} por={passMeta.adminPor}
+          form={formAdmin} setForm={setFormAdmin} show={showAdmin} setShow={setShowAdmin}
+          placeholder="Nueva contraseña para admin, coordinación, dirección y voluntariado (gestión)"/>
+        <Bloque titulo="Voluntarios" icon="🙋" color={C.green} tipo="voluntario"
+          fecha={passMeta.volFecha} por={passMeta.volPor}
+          form={formVol} setForm={setFormVol} show={showVol} setShow={setShowVol}
+          placeholder="Nueva contraseña para vol0001 – vol9999"/>
+      </div>
+    </div>
+  );
+};
+
 // ── App ───────────────────────────────────────────────────────────────────────
 function App(){
   const [auth,setAuth]=useState(null); // null | {role,nombre,usuario}
@@ -2400,6 +2441,9 @@ function App(){
   const [comunicados,setComunicados]=useState(INIT_COMUNICADOS);
   const [centros,setCentros]=useState(INIT_CENTROS);
   const [confirm,setConfirm]=useState(INIT_CONFIRM);
+  const [passAdmin,setPassAdmin]=useState(INIT_PASS_ADMIN);
+  const [passVoluntario,setPassVoluntario]=useState(INIT_PASS_VOLUNTARIO);
+  const [passMeta,setPassMeta]=useState({adminFecha:null,adminPor:null,volFecha:null,volPor:null});
 
   // ── Sincronización con Google Drive (opcional) ──────────────────────────────
   const [syncMsg,setSyncMsg]=useState(SHEETS_URL?"Conectando con Drive…":"Modo local");
@@ -2422,6 +2466,9 @@ function App(){
         if(Array.isArray(data.actTipos)&&data.actTipos.length)setActTipos(data.actTipos);
         if(Array.isArray(data.tareas)&&data.tareas.length)setTareas(data.tareas);
         if(Array.isArray(data.centros)&&data.centros.length)setCentros(data.centros);
+        if(typeof data.passAdmin==="string"&&data.passAdmin)setPassAdmin(data.passAdmin);
+        if(typeof data.passVoluntario==="string"&&data.passVoluntario)setPassVoluntario(data.passVoluntario);
+        if(data.passMeta&&typeof data.passMeta==="object")setPassMeta(data.passMeta);
         setSyncOk(true);setSyncMsg("Sincronizado con Drive");
       }catch(e){setSyncOk(false);setSyncMsg("Sin conexión a Drive (modo local)");}
     })();
@@ -2434,12 +2481,12 @@ function App(){
     const t=setTimeout(()=>{
       setSyncMsg("Guardando…");
       fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-        body:JSON.stringify({vols,confirm,comunicados,acts,tareas,centros,aceptaciones,docsPolitica,actTipos})})
+        body:JSON.stringify({vols,confirm,comunicados,acts,tareas,centros,aceptaciones,docsPolitica,actTipos,passAdmin,passVoluntario,passMeta})})
         .then(()=>{setSyncOk(true);setSyncMsg("Guardado en Drive");})
         .catch(()=>{setSyncOk(false);setSyncMsg("Error al guardar (modo local)");});
     },1200);
     return ()=>clearTimeout(t);
-  },[vols,confirm,comunicados,acts,tareas,centros,aceptaciones,docsPolitica,actTipos]);
+  },[vols,confirm,comunicados,acts,tareas,centros,aceptaciones,docsPolitica,actTipos,passAdmin,passVoluntario,passMeta]);
   const navGroupsFiltrados = auth && auth.role==="voluntario"
     ? NAV_GROUPS.map(g=>({...g,items:g.items.filter(i=>VOL_PAGES.includes(i.id))})).filter(g=>g.items.length>0)
     : NAV_GROUPS;
@@ -2458,11 +2505,23 @@ function App(){
       }).filter(([k])=>VOL_PAGES.includes(k)))
     : null;
 
-  if (!auth) return <Login onLogin={info=>{
+  if (!auth) return <Login passAdmin={passAdmin} passVoluntario={passVoluntario} onLogin={info=>{
     const ficha=info.volId?vols.find(v=>v.id===info.volId):null;
     setAuth({...info,nombre:ficha?ficha.nombre:info.nombre});
     setPage("dashboard");
   }} />;
+
+  const onCambiarPassword=(tipo,nuevaPlano)=>{
+    const hash=sha256(nuevaPlano);
+    const ahora=new Date().toISOString();
+    if(tipo==="admin"){
+      setPassAdmin(hash);
+      setPassMeta(m=>({...m,adminFecha:ahora,adminPor:auth?auth.nombre:""}));
+    }else{
+      setPassVoluntario(hash);
+      setPassMeta(m=>({...m,volFecha:ahora,volPor:auth?auth.nombre:""}));
+    }
+  };
 
   const pages= pagesFiltradas ?? {
     dashboard:<Dashboard vols={vols} acts={acts} tareas={tareas} comunicados={comunicados} setPage={setPage}/>,
@@ -2475,6 +2534,7 @@ function App(){
     comunicados:<Comunicados comunicados={comunicados} setComunicados={setComunicados} isAdmin={true} vols={vols}/>,
     proyectos:<Proyectos centros={centros} setCentros={setCentros} isAdmin={true}/>,
     politica:<Politica vols={vols} auth={auth} isAdmin={true} aceptaciones={aceptaciones} setAceptaciones={setAceptaciones} docs={docsPolitica} setDocs={setDocsPolitica}/>,
+    passwords:<ContrasenasSistema passMeta={passMeta} onCambiar={onCambiarPassword}/>,
   };
 
   return(

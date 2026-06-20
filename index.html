@@ -2468,6 +2468,7 @@ function App(){
   // ── Sincronización con Google Drive ────────────────────────────────────────
   const [syncMsg,setSyncMsg]=useState(SHEETS_URL?"Conectando con Drive…":"Modo local");
   const [syncOk,setSyncOk]=useState(false);
+  const [saveError,setSaveError]=useState(false); // true = hay cambios sin guardar en Drive
   const pendingSave=useRef(false);   // hay cambios locales sin guardar
   const saving=useRef(false);        // guardado en curso
   const stateRef=useRef({});         // referencia viva al estado actual para el guardado
@@ -2505,31 +2506,49 @@ function App(){
     return()=>clearInterval(interval);
   },[loadFromDrive]);
 
+  // Función para reintentar guardado manualmente
+  const retrySave=async()=>{
+    if(!SHEETS_URL||saving.current)return;
+    saving.current=true;
+    setSyncMsg("Reintentando guardado…");
+    setSaveError(false);
+    try{
+      const r=await fetch(SHEETS_URL+"?action=load&t="+Date.now());
+      const remote=await r.json();
+      const merged={...remote,...stateRef.current};
+      await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+        body:JSON.stringify(merged)});
+      setSyncOk(true);setSyncMsg("Guardado en Drive");
+      pendingSave.current=false;
+      setSaveError(false);
+    }catch(e){
+      setSyncOk(false);setSyncMsg("Error al guardar (modo local)");
+      setSaveError(true);
+    }finally{saving.current=false;}
+  };
+
   // Guardar con anti-conflicto: leer Drive → fusionar → escribir
   const saveRef=useRef(null);
   useEffect(()=>{
     if(!SHEETS_URL)return;
     pendingSave.current=true;
+    setSaveError(false);
     if(saveRef.current)clearTimeout(saveRef.current);
     saveRef.current=setTimeout(async()=>{
       saving.current=true;
       setSyncMsg("Guardando…");
       try{
-        // 1. Leer estado actual en Drive
         const r=await fetch(SHEETS_URL+"?action=load&t="+Date.now());
         const remote=await r.json();
-        // 2. Fusionar: el estado local tiene prioridad en las secciones que YO edité,
-        //    pero respeto las secciones que NO cambié si Drive tiene algo más nuevo.
-        //    Estrategia simple y segura: el local gana (ya tiene lo de Drive desde la
-        //    última carga) pero escribimos todo junto para no dejar huecos.
         const merged={...remote,...stateRef.current};
-        // 3. Escribir el estado fusionado
         await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
           body:JSON.stringify(merged)});
         setSyncOk(true);setSyncMsg("Guardado en Drive");
         pendingSave.current=false;
+        setSaveError(false);
       }catch(e){
-        setSyncOk(false);setSyncMsg("Error al guardar (modo local)");
+        setSyncOk(false);setSyncMsg("Error al guardar — cambios NO guardados");
+        setSaveError(true);
       }finally{saving.current=false;}
     },1200);
     return()=>{if(saveRef.current)clearTimeout(saveRef.current);};
@@ -2600,6 +2619,20 @@ function App(){
     <div style={{display:"flex",minHeight:"100vh",background:C.grayLight}}>
       <Sidebar current={page} setCurrent={setPage} collapsed={collapsed} setCollapsed={setCollapsed} navGroups={navGroupsFiltrados} auth={auth} onLogout={logout}/>
       <main style={{flex:1,overflowY:"auto",maxHeight:"100vh"}}>
+        {/* Banner de error de guardado */}
+        {saveError&&(
+          <div style={{background:C.red,color:C.white,padding:"10px 32px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:100}}>
+            <span style={{fontSize:18}}>⚠️</span>
+            <div style={{flex:1,fontWeight:700,fontSize:13}}>
+              Tus cambios NO se guardaron en Drive. Revisa tu conexión a internet.
+            </div>
+            <button onClick={retrySave}
+              style={{padding:"6px 16px",background:C.white,border:"none",borderRadius:8,
+                cursor:"pointer",color:C.red,fontWeight:800,fontSize:13}}>
+              🔄 Reintentar ahora
+            </button>
+          </div>
+        )}
         {/* Top bar with user info */}
         <div style={{background:C.white,borderBottom:`1px solid ${C.grayBorder}`,padding:"10px 32px",display:"flex",alignItems:"center",justifyContent:"flex-end",gap:12,position:"sticky",top:0,zIndex:50}}>
           <span title={syncMsg} style={{display:"flex",alignItems:"center",gap:6,fontSize:11.5,fontWeight:700,

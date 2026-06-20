@@ -1554,7 +1554,7 @@ const Calendario=({acts,setPage})=>{
 const emptyCom={titulo:"",contenido:"",tipo:"general",autor:"",destinatario:"todos",grupo:"",canales:["correo"]};
 const DEST_LABEL={todos:"👥 Todos",activos:"✅ Solo activos",internacionales:"🌎 Internacionales",grupo:"📍 Por grupo/centro"};
 
-const Comunicados=({comunicados,setComunicados,isAdmin})=>{
+const Comunicados=({comunicados,setComunicados,isAdmin,vols})=>{
   const [modal,setModal]=useState(false);
   const [form,setForm]=useState(emptyCom);
   const [editId,setEditId]=useState(null);
@@ -1570,6 +1570,45 @@ const Comunicados=({comunicados,setComunicados,isAdmin})=>{
     if(editId)setComunicados(comunicados.map(c=>c.id===editId?{...item,id:editId}:c));
     else setComunicados([{...item,id:uid()},...comunicados]);
     setModal(false);
+    // Enviar por canales seleccionados
+    const canales=form.canales||[];
+    if(canales.length===0)return;
+    // Filtrar destinatarios según la selección
+    let destVols=vols.filter(v=>v.correo||v.telefono);
+    if(form.destinatario==="activos") destVols=destVols.filter(v=>v.activo);
+    else if(form.destinatario==="internacionales") destVols=destVols.filter(v=>v.tipo==="internacional");
+    else if(form.destinatario==="grupo"&&form.grupo) destVols=destVols.filter(v=>v.area===form.grupo||v.rol===form.grupo);
+    const msgText=`*${form.titulo}*\n\n${form.contenido}\n\n— ${form.autor||"Fundación Bolivia Digna"} · ${form.fecha||hoy}`;
+    const asunto=encodeURIComponent(form.titulo);
+    const cuerpo=encodeURIComponent(`${form.contenido}\n\n— ${form.autor||"Fundación Bolivia Digna"} · ${form.fecha||hoy}`);
+    // WhatsApp: abrir una pestaña por cada voluntario con teléfono
+    if(canales.includes("whatsapp")){
+      const voluntariosWA=destVols.filter(v=>v.telefono);
+      if(voluntariosWA.length===0){window.alert("Ningún destinatario tiene teléfono registrado para WhatsApp.");}
+      else{
+        const confirmar=window.confirm(`Se abrirán ${voluntariosWA.length} ventana(s) de WhatsApp (una por voluntario). ¿Continuar?\n\nAsegúrate de que el navegador permita las ventanas emergentes.`);
+        if(confirmar){
+          voluntariosWA.forEach((v,i)=>{
+            setTimeout(()=>{
+              const tel="591"+(v.telefono||"").replace(/\D/g,"");
+              window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msgText)}`,"_blank");
+            },i*600);
+          });
+        }
+      }
+    }
+    // Correo: abrir Gmail con todos los destinatarios en CC
+    if(canales.includes("correo")){
+      const voluntariosCorreo=destVols.filter(v=>v.correo);
+      if(voluntariosCorreo.length===0){window.alert("Ningún destinatario tiene correo electrónico registrado.");}
+      else{
+        const confirmar=window.confirm(`Se abrirá Gmail con ${voluntariosCorreo.length} destinatario(s) en copia. ¿Continuar?`);
+        if(confirmar){
+          const correos=voluntariosCorreo.map(v=>v.correo).join(",");
+          window.open(`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(correos)}&su=${asunto}&body=${cuerpo}`,"_blank");
+        }
+      }
+    }
   };
   const del=id=>{if(window.confirm("¿Eliminar este comunicado?"))setComunicados(comunicados.filter(c=>c.id!==id));};
   const toggleCanal=ch=>setForm(f=>({...f,canales:(f.canales||[]).includes(ch)?f.canales.filter(x=>x!==ch):[...(f.canales||[]),ch]}));
@@ -1671,7 +1710,7 @@ const Comunicados=({comunicados,setComunicados,isAdmin})=>{
                 }}>{(form.canales||[]).includes(o.v)?"✓ ":""}{o.l}</button>
               ))}
             </div>
-            <div style={{fontSize:10.5,color:C.gray,marginTop:6}}>El comunicado se enviará automáticamente por los canales seleccionados a los destinatarios elegidos.</div>
+            <div style={{fontSize:10.5,color:C.gray,marginTop:6}}>Al guardar, el sistema abrirá Gmail (correo) y/o WhatsApp con el mensaje prellenado para cada destinatario.</div>
           </div>
           <div style={{marginBottom:20}}>
             <label style={{fontSize:13,fontWeight:700,color:C.dark,display:"block",marginBottom:6}}>Contenido *</label>
@@ -2308,7 +2347,7 @@ const Directorio=({vols,setPage,isAdmin})=>{
                 <td style={{padding:"12px"}}>
                   <div style={{display:"flex",gap:6,justifyContent:"center"}}>
                     {v.telefono&&<a href={waLink(v.telefono)} target="_blank" rel="noreferrer" title="WhatsApp" style={{textDecoration:"none",border:`1.5px solid ${C.green}`,color:C.green,borderRadius:8,padding:"5px 10px",fontSize:12,fontWeight:700}}>💬</a>}
-                    {v.correo&&<a href={`mailto:${v.correo}`} title="Correo" style={{textDecoration:"none",border:`1.5px solid ${C.accent}`,color:C.accent,borderRadius:8,padding:"5px 10px",fontSize:12,fontWeight:700}}>✉️</a>}
+                    {v.correo&&<a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(v.correo)}`} target="_blank" rel="noreferrer" title="Enviar correo por Gmail" style={{textDecoration:"none",border:`1.5px solid ${C.accent}`,color:C.accent,borderRadius:8,padding:"5px 10px",fontSize:12,fontWeight:700}}>✉️</a>}
                   </div>
                 </td>
               </tr>
@@ -2387,7 +2426,7 @@ function App(){
         actividades:<Actividades acts={acts} setActs={setActs} vols={vols} isAdmin={false} auth={auth} tipos={actTipos} setTipos={setActTipos}/>,
         tareas:<Tareas tareas={tareas} setTareas={setTareas} isAdmin={false}/>,
         calendario:<Calendario acts={acts} setActs={setActs} setPage={setPage}/>,
-        comunicados:<Comunicados comunicados={comunicados} setComunicados={setComunicados} isAdmin={false}/>,
+        comunicados:<Comunicados comunicados={comunicados} setComunicados={setComunicados} isAdmin={false} vols={vols}/>,
         proyectos:<Proyectos centros={centros} setCentros={setCentros} isAdmin={false}/>,
         politica:<Politica vols={vols} auth={auth} isAdmin={false} aceptaciones={aceptaciones} setAceptaciones={setAceptaciones} docs={docsPolitica} setDocs={setDocsPolitica}/>,
       }).filter(([k])=>VOL_PAGES.includes(k)))
@@ -2407,7 +2446,7 @@ function App(){
     actividades:<Actividades acts={acts} setActs={setActs} vols={vols} isAdmin={true} auth={auth} tipos={actTipos} setTipos={setActTipos}/>,
     tareas:<Tareas tareas={tareas} setTareas={setTareas} isAdmin={true}/>,
     calendario:<Calendario acts={acts} setActs={setActs} setPage={setPage}/>,
-    comunicados:<Comunicados comunicados={comunicados} setComunicados={setComunicados} isAdmin={true}/>,
+    comunicados:<Comunicados comunicados={comunicados} setComunicados={setComunicados} isAdmin={true} vols={vols}/>,
     proyectos:<Proyectos centros={centros} setCentros={setCentros} isAdmin={true}/>,
     politica:<Politica vols={vols} auth={auth} isAdmin={true} aceptaciones={aceptaciones} setAceptaciones={setAceptaciones} docs={docsPolitica} setDocs={setDocsPolitica}/>,
   };

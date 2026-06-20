@@ -300,11 +300,11 @@ const CENTRO_IMG={
 
 // ── Sample Data ──────────────────────────────────────────────────────────────
 const INIT_VOLS=[
-  {id:1,nombre:"Ana Rojas",edad:25,telefono:"75012345",correo:"ana.rojas@gmail.com",area:"Educación",rol:"Educador",tipo:"nacional",areaEstudio:"Pedagogía",disponibilidad:["Lunes","Miércoles","Viernes"],bloques:["manana","tarde"],activo:true,horasSemana:6,horasAcumuladas:24,faltas:0,ubicaciones:["Nuestra Señora de la Salette","Mercado Campesino de Arocagua"],proyectoPref:"Nuestra Señora de la Salette",comentarios:"Voluntaria con experiencia en talleres educativos."},
-  {id:2,nombre:"Luis Mamani",edad:30,telefono:"72345678",correo:"luis.mamani@gmail.com",area:"Logística",rol:"Apoyo",tipo:"nacional",areaEstudio:"Administración",disponibilidad:["Martes","Jueves"],bloques:["mediodia"],activo:true,horasSemana:4,horasAcumuladas:16,faltas:1,ubicaciones:["Mercado Campesino de Arocagua","Sede Principal"],proyectoPref:"Mercado Campesino de Arocagua",comentarios:""},
-  {id:3,nombre:"María Flores",edad:22,telefono:"71234567",correo:"maria.flores@gmail.com",area:"Comunicación",rol:"Auxiliar",tipo:"nacional",areaEstudio:"Comunicación Social",disponibilidad:["Lunes","Sábado"],bloques:["tarde"],activo:false,horasSemana:0,horasAcumuladas:8,faltas:3,ubicaciones:[],proyectoPref:"",comentarios:"Disponible solo fines de semana."},
-  {id:4,nombre:"Carlos Quispe",edad:28,telefono:"76543210",correo:"carlos.quispe@gmail.com",area:"Salud",rol:"Responsable",tipo:"nacional",areaEstudio:"Enfermería",disponibilidad:["Miércoles","Sábado"],bloques:["manana","tarde"],activo:true,horasSemana:8,horasAcumuladas:40,faltas:0,ubicaciones:["Hospital de Niños","Papa Francisco Uspha Uspha"],proyectoPref:"Hospital de Niños",comentarios:"Técnico en enfermería."},
-  {id:5,nombre:"Jean Pierre Dubois",edad:24,telefono:"66554433",correo:"jean.dubois@gmail.com",area:"Arte",rol:"Apoyo",tipo:"internacional",areaEstudio:"Trabajo Social",disponibilidad:["Lunes","Martes","Miércoles","Jueves","Viernes"],bloques:["manana","mediodia","tarde"],activo:true,horasSemana:12,horasAcumuladas:48,faltas:0,ubicaciones:["Vicente Cañas Valle Hermoso"],proyectoPref:"Vicente Cañas Valle Hermoso",comentarios:"Voluntario internacional de Francia, estancia de 6 meses."},
+  {id:1,volUsuario:"vol001",nombre:"Ana Rojas",edad:25,telefono:"75012345",correo:"ana.rojas@gmail.com",area:"Educación",rol:"Educador",tipo:"nacional",areaEstudio:"Pedagogía",disponibilidad:["Lunes","Miércoles","Viernes"],bloques:["manana","tarde"],activo:true,horasSemana:6,horasAcumuladas:24,faltas:0,ubicaciones:["Nuestra Señora de la Salette","Mercado Campesino de Arocagua"],proyectoPref:"Nuestra Señora de la Salette",comentarios:"Voluntaria con experiencia en talleres educativos."},
+  {id:2,volUsuario:"vol002",nombre:"Luis Mamani",edad:30,telefono:"72345678",correo:"luis.mamani@gmail.com",area:"Logística",rol:"Apoyo",tipo:"nacional",areaEstudio:"Administración",disponibilidad:["Martes","Jueves"],bloques:["mediodia"],activo:true,horasSemana:4,horasAcumuladas:16,faltas:1,ubicaciones:["Mercado Campesino de Arocagua","Sede Principal"],proyectoPref:"Mercado Campesino de Arocagua",comentarios:""},
+  {id:3,volUsuario:"vol003",nombre:"María Flores",edad:22,telefono:"71234567",correo:"maria.flores@gmail.com",area:"Comunicación",rol:"Auxiliar",tipo:"nacional",areaEstudio:"Comunicación Social",disponibilidad:["Lunes","Sábado"],bloques:["tarde"],activo:false,horasSemana:0,horasAcumuladas:8,faltas:3,ubicaciones:[],proyectoPref:"",comentarios:"Disponible solo fines de semana."},
+  {id:4,volUsuario:"vol004",nombre:"Carlos Quispe",edad:28,telefono:"76543210",correo:"carlos.quispe@gmail.com",area:"Salud",rol:"Responsable",tipo:"nacional",areaEstudio:"Enfermería",disponibilidad:["Miércoles","Sábado"],bloques:["manana","tarde"],activo:true,horasSemana:8,horasAcumuladas:40,faltas:0,ubicaciones:["Hospital de Niños","Papa Francisco Uspha Uspha"],proyectoPref:"Hospital de Niños",comentarios:"Técnico en enfermería."},
+  {id:5,volUsuario:"vol005",nombre:"Jean Pierre Dubois",edad:24,telefono:"66554433",correo:"jean.dubois@gmail.com",area:"Arte",rol:"Apoyo",tipo:"internacional",areaEstudio:"Trabajo Social",disponibilidad:["Lunes","Martes","Miércoles","Jueves","Viernes"],bloques:["manana","mediodia","tarde"],activo:true,horasSemana:12,horasAcumuladas:48,faltas:0,ubicaciones:["Vicente Cañas Valle Hermoso"],proyectoPref:"Vicente Cañas Valle Hermoso",comentarios:"Voluntario internacional de Francia, estancia de 6 meses."},
 ];
 // ── Centros / Proyectos ───────────────────────────────────────────────────────
 const INIT_CENTROS=[
@@ -773,7 +773,10 @@ const Dashboard=({vols,acts,tareas,comunicados,setPage})=>{
     </div>
   );
 };
-const emptyVol={nombre:"",edad:"",telefono:"",correo:"",area:"Educación",rol:"Apoyo",tipo:"nacional",areaEstudio:"",disponibilidad:[],bloques:[],activo:true,horasSemana:0,horasAcumuladas:0,faltas:0,ubicaciones:[],proyectoPref:"",comentarios:""};
+const emptyVol={nombre:"",edad:"",telefono:"",correo:"",area:"Educación",rol:"Apoyo",tipo:"nacional",areaEstudio:"",disponibilidad:[],bloques:[],activo:true,horasSemana:0,horasAcumuladas:0,faltas:0,ubicaciones:[],proyectoPref:"",comentarios:"",volUsuario:""};
+// Genera lista de opciones vol001–vol100 para el selector
+const VOL_USUARIO_OPTS=[{value:"",label:"— Sin cuenta asignada —"},...Array.from({length:100},(_,i)=>{const n=String(i+1).padStart(3,"0");return{value:`vol${n}`,label:`vol${n}`};})];
+
 
 const Voluntarios=({vols,setVols})=>{
   const [modal,setModal]=useState(false);
@@ -790,9 +793,22 @@ const Voluntarios=({vols,setVols})=>{
     // Regla: 3 o más faltas → inactivo automáticamente
     const faltas=Number(form.faltas)||0;
     const activo=faltas>=3?false:form.activo;
+    // Si tiene volUsuario asignado, el id debe coincidir con el número (vol042 → id:42)
+    // para que el login lo vincule correctamente.
+    let assignedId=editId;
+    if(!editId){
+      if(form.volUsuario){
+        const num=parseInt(form.volUsuario.replace("vol",""),10);
+        // Verificar que ese id no esté ya en uso por otro voluntario
+        if(vols.find(v=>v.id===num)){window.alert(`El usuario ${form.volUsuario} ya está asignado a otro voluntario. Por favor elige otro.`);return;}
+        assignedId=num;
+      } else {
+        assignedId=uid();
+      }
+    }
     const item={...form,faltas,activo};
     if(editId)setVols(vols.map(v=>v.id===editId?{...item,id:editId}:v));
-    else setVols([...vols,{...item,id:uid()}]);
+    else setVols([...vols,{...item,id:assignedId}]);
     setModal(false);
   };
   const del=id=>{if(window.confirm("¿Eliminar este voluntario?"))setVols(vols.filter(v=>v.id!==id));};
@@ -849,6 +865,7 @@ const Voluntarios=({vols,setVols})=>{
                 <div>
                   <div style={{fontWeight:800,fontSize:15,color:C.dark}}>{v.nombre}</div>
                   <div style={{fontSize:12,color:C.gray,marginTop:2}}>{v.area}{v.areaEstudio?` · 🎓 ${v.areaEstudio}`:""}</div>
+                  {v.volUsuario&&<div style={{fontSize:11,fontWeight:700,color:C.accent,marginTop:2,background:"#e3f2fd",borderRadius:6,padding:"1px 7px",display:"inline-block"}}>🔑 {v.volUsuario}</div>}
                 </div>
               </div>
               <Badge label={v.activo?"✓ Activo":"✗ Inactivo"} color={v.activo?C.primary:C.gray} bg={v.activo?C.cardBg:"#eee"}/>
@@ -905,6 +922,13 @@ const Voluntarios=({vols,setVols})=>{
             <Input label="Teléfono" value={form.telefono} onChange={v=>setForm({...form,telefono:v})} placeholder="7xxxxxxx"/>
           </div>
           <Input label="Correo electrónico" value={form.correo} onChange={v=>setForm({...form,correo:v})} type="email" placeholder="correo@ejemplo.com"/>
+          <div style={{marginBottom:16}}>
+            <Select label="🔑 Usuario del sistema (cuenta de acceso)" value={form.volUsuario||""} onChange={v=>setForm({...form,volUsuario:v})} options={VOL_USUARIO_OPTS}/>
+            <div style={{fontSize:11,color:C.gray,marginTop:-8,marginBottom:4,lineHeight:1.6}}>
+              Asigna el usuario con el que esta persona iniciará sesión. La contraseña la entrega coordinación (ver documento de credenciales).
+              {form.volUsuario&&<span style={{marginLeft:6,fontWeight:700,color:C.accent}}>→ Usuario: <b>{form.volUsuario}</b> · Contraseña vigente: Girasol-798</span>}
+            </div>
+          </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <Select label="Área" value={form.area} onChange={v=>setForm({...form,area:v})} options={AREAS}/>
             <Select label="Rol del voluntario" value={form.rol} onChange={v=>setForm({...form,rol:v})} options={ROLES}/>
@@ -2329,6 +2353,7 @@ const Directorio=({vols,setPage,isAdmin})=>{
           <thead>
             <tr style={{background:C.bg}}>
               <th style={{textAlign:"left",padding:"12px",color:C.gray,fontWeight:700,borderRadius:"8px 0 0 8px"}}>Nombre</th>
+              <th style={{textAlign:"left",padding:"12px",color:C.gray,fontWeight:700}}>🔑 Usuario</th>
               <th style={{textAlign:"left",padding:"12px",color:C.gray,fontWeight:700}}>Teléfono</th>
               <th style={{textAlign:"left",padding:"12px",color:C.gray,fontWeight:700}}>Correo</th>
               <th style={{textAlign:"left",padding:"12px",color:C.gray,fontWeight:700}}>Tipo</th>
@@ -2340,6 +2365,7 @@ const Directorio=({vols,setPage,isAdmin})=>{
             {filtered.map(v=>(
               <tr key={v.id} style={{borderBottom:`1px solid ${C.grayBorder}`}}>
                 <td style={{padding:"12px",fontWeight:700,color:C.dark}}>{v.nombre}<div style={{fontSize:11,color:C.gray,fontWeight:400}}>{v.rol} · {v.area}</div></td>
+                <td style={{padding:"12px"}}>{v.volUsuario?<span style={{fontWeight:700,color:C.accent,background:"#e3f2fd",borderRadius:6,padding:"3px 10px",fontSize:12}}>🔑 {v.volUsuario}</span>:<span style={{color:C.gray,fontSize:12}}>—</span>}</td>
                 <td style={{padding:"12px",color:C.gray}}>{v.telefono||"—"}</td>
                 <td style={{padding:"12px",color:C.gray,maxWidth:180,overflow:"hidden",textOverflow:"ellipsis"}}>{v.correo||"—"}</td>
                 <td style={{padding:"12px"}}><Badge label={v.tipo==="internacional"?"🌎 Intl.":"🇧🇴 Nac."} color={v.tipo==="internacional"?C.accent:C.green} bg={v.tipo==="internacional"?"#e3f2fd":C.greenPale}/></td>

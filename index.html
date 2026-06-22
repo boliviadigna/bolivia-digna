@@ -2623,13 +2623,21 @@ function App(){
       const data=await r.json(); // si Apps Script devolvió HTML de error, esto lanza y cae al catch (no se confunde con datos válidos)
       // Solo aplicar si NO hay un guardado pendiente para no pisar cambios propios
       if(!pendingSave.current&&!saving.current){
-        skipSaveEffect.current=true; // lo que vamos a aplicar viene de Drive, no es un cambio del usuario
-        applyDriveData(data,setters);
+        // OJO: solo activamos la bandera skipSaveEffect si sabemos con certeza que al menos
+        // un setter de applyDriveData va a ejecutarse de verdad (si no, el efecto de guardado
+        // nunca se vuelve a disparar para "consumir" la bandera, y quedaría trabada bloqueando
+        // el próximo guardado real). Esto pasa, por ejemplo, la primera vez que alguien usa el
+        // sistema y Drive todavía está completamente vacío.
+        const hayAlgoQueAplicar=Array.isArray(data.vols)||Array.isArray(data.confirm)||Array.isArray(data.comunicados)||
+          Array.isArray(data.acts)||Array.isArray(data.tareas)||Array.isArray(data.centros)||Array.isArray(data.docsPolitica)||
+          Array.isArray(data.actTipos)||(data.aceptaciones&&typeof data.aceptaciones==="object")||
+          (typeof data.passAdmin==="string"&&data.passAdmin)||(typeof data.passVoluntario==="string"&&data.passVoluntario)||
+          (data.passMeta&&typeof data.passMeta==="object");
+        if(hayAlgoQueAplicar){
+          skipSaveEffect.current=true; // lo que vamos a aplicar viene de Drive, no es un cambio del usuario
+          applyDriveData(data,setters);
+        }
         baselineRef.current=mergeBaselineFromLoad(baselineRef.current,data); // esto es lo que sabemos que coincide con Drive ahora
-        // red de seguridad: si por algún motivo el efecto de guardado no llegó a
-        // consumir la bandera (ej. los datos de Drive eran iguales a los locales
-        // y no hubo re-render), la liberamos igual para no dejarla trabada.
-        setTimeout(()=>{skipSaveEffect.current=false;},0);
       }
       if(!quiet){setSyncOk(true);setSyncMsg("Sincronizado con Drive");}
     }catch(e){
@@ -2675,7 +2683,6 @@ function App(){
       baselineRef.current=merged; // ya coincide con lo que quedó guardado en Drive
       skipSaveEffect.current=true; // lo que vamos a reflejar es el resultado del guardado, no una edición nueva
       applyMergedToState(merged,setters); // por si alguien más agregó/editó algo mientras guardábamos
-      setTimeout(()=>{skipSaveEffect.current=false;},0);
       setSyncOk(true);setSyncMsg("Guardado en Drive");
       pendingSave.current=false;
       setSaveError(false);
@@ -2702,7 +2709,6 @@ function App(){
         baselineRef.current=merged; // ya coincide con lo que quedó guardado en Drive
         skipSaveEffect.current=true; // lo que vamos a reflejar es el resultado del guardado, no una edición nueva
         applyMergedToState(merged,setters); // por si alguien más agregó/editó algo mientras guardábamos
-        setTimeout(()=>{skipSaveEffect.current=false;},0);
         setSyncOk(true);setSyncMsg("Guardado en Drive");
         pendingSave.current=false;
         setSaveError(false);

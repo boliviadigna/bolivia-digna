@@ -1691,6 +1691,10 @@ const HORAS_SESION=2; // 2 horas por cada día cumplido
 const CELL_STYLE={confirmado:{bg:"#e3f2fd",co:C.accent,t:"C"},asistio:{bg:C.greenPale,co:C.green,t:"✓"},falta:{bg:C.redPale,co:C.red,t:"F"},"":{bg:C.white,co:C.grayBorder,t:"–"}};
 const getMonday=off=>{const d=new Date();const day=d.getDay();const diff=d.getDate()-day+(day===0?-6:1)+off*7;return new Date(d.setDate(diff));};
 const fmtFecha=d=>`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+// Clave estable (año-mes-día local, sin horas) para etiquetar a qué semana pertenece cada
+// registro de confirmación. Así cada semana queda aislada: lo de una semana no se mezcla
+// ni se repite en la siguiente, y al pasar a una semana nueva, ésta arranca en blanco.
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 
 // ════════ VISTA ADMINISTRADOR · Disposición del día ════════
 // Exporta la semana visible como hoja membretada imprimible (PDF vía diálogo de impresión)
@@ -1753,6 +1757,12 @@ const Confirmacion=({confirm,setConfirm,vols,setVols,centros,setPage})=>{
 
   const monday=getMonday(weekOffset);
   const sunday=new Date(monday.getTime()+6*86400000);
+  const semanaKey=ymd(monday); // semana que se está viendo ahora
+  const hoyKey=ymd(getMonday(0)); // semana real de hoy, para registros viejos sin etiqueta de semana
+  // Solo los registros de la semana que se está viendo. Los registros creados antes de este
+  // arreglo no tienen "semana" guardada: por compatibilidad, esos se consideran de "hoy" (la
+  // semana real actual), nunca de otra semana navegada.
+  const rowsSemana=confirm.filter(r=>(r.semana||hoyKey)===semanaKey);
 
   // Marcado de asistencia por el administrador: ✓ asistió, F falta. (No cambia la disponibilidad C del voluntario salvo a ✓/F)
   const cycleAsist=v=>v==="asistio"?"falta":v==="falta"?"confirmado":"asistio";
@@ -1771,20 +1781,23 @@ const Confirmacion=({confirm,setConfirm,vols,setVols,centros,setPage})=>{
     return newVols;
   };
   const validar=(row)=>{
+    if(row.validado)return; // ya se contabilizó esta semana, evita duplicar horas/faltas
     const vol=vols.find(v=>v.id===row.volId);if(!vol)return;
     const asis=DIAS_SEM.filter(d=>row.dias[d]==="asistio").length;
     const fal=DIAS_SEM.filter(d=>row.dias[d]==="falta").length;
     const nuevasFaltas=(Number(vol.faltas)||0)+fal;
     setVols(aplicar([...vols],row));
-    setConfirm(confirm.map(r=>r.id===row.id?{...r,dias:DIAS_SEM.reduce((o,d)=>{o[d]="";return o;},{})}:r));
+    // Ya NO se borran los días: cada semana queda como historial propio (se puede
+    // seguir viendo navegando a "Semana anterior"). Solo se marca como validada.
+    setConfirm(confirm.map(r=>r.id===row.id?{...r,validado:true}:r));
     window.alert(`Jornada validada para ${vol.nombre}: +${asis*HORAS_SESION}h acumuladas${fal>0?`, ${fal} falta(s) registrada(s)`:""}.${nuevasFaltas>=3?" ⚠️ Pasa a INACTIVO (3 faltas).":""}`);
   };
 
   const nombreCentro=r=>r.centro||"— Sin asignar —";
-  const centrosConData=[...new Set(confirm.map(r=>r.centro).filter(Boolean))];
+  const centrosConData=[...new Set(rowsSemana.map(r=>r.centro).filter(Boolean))];
   const centroOpts=[...new Set([...(centros||[]).map(c=>c.nombre),...centrosConData])].filter(Boolean);
-  const pendientesN=confirm.filter(r=>!r.centro).length;
-  const filtradas=confirm.filter(r=>filtro==="todos"?true:filtro==="pendientes"?!r.centro:r.centro===filtro);
+  const pendientesN=rowsSemana.filter(r=>!r.centro).length;
+  const filtradas=rowsSemana.filter(r=>filtro==="todos"?true:filtro==="pendientes"?!r.centro:r.centro===filtro);
 
   const openAsignar=()=>{
     const v0=vols.find(v=>v.activo)||vols[0];
@@ -1794,7 +1807,7 @@ const Confirmacion=({confirm,setConfirm,vols,setVols,centros,setPage})=>{
   const addAsign=()=>{
     const vid=Number(aForm.volId);
     if(!vid||!aForm.centro){window.alert("Selecciona voluntario y centro.");return;}
-    setConfirm([...confirm,{id:uid(),volId:vid,centro:aForm.centro,bloque:aForm.bloque,dias:{},obs:""}]);
+    setConfirm([...confirm,{id:uid(),volId:vid,centro:aForm.centro,bloque:aForm.bloque,dias:{},obs:"",semana:semanaKey}]);
     setAsignar(false);
   };
   const delRow=id=>{if(window.confirm("¿Quitar esta asignación / disponibilidad?"))setConfirm(confirm.filter(r=>r.id!==id));};
@@ -1805,14 +1818,14 @@ const Confirmacion=({confirm,setConfirm,vols,setVols,centros,setPage})=>{
   };
 
   const validarTodos=()=>{
-    const visibles=filtradas;
-    if(!visibles.length)return;
+    const visibles=filtradas.filter(r=>!r.validado);
+    if(!visibles.length){window.alert("No hay registros pendientes de validar en esta semana (o ya fueron validados).");return;}
     if(!window.confirm(`¿Validar la jornada de ${visibles.length} registro(s)? Se sumarán las horas (2 por día con ✓) y las faltas se registrarán.`))return;
     let newVols=[...vols];
     visibles.forEach(row=>{newVols=aplicar(newVols,row);});
     setVols(newVols);
     const ids=new Set(visibles.map(r=>r.id));
-    setConfirm(confirm.map(r=>ids.has(r.id)?{...r,dias:DIAS_SEM.reduce((o,d)=>{o[d]="";return o;},{})}:r));
+    setConfirm(confirm.map(r=>ids.has(r.id)?{...r,validado:true}:r));
     window.alert("Jornada validada correctamente.");
   };
 
@@ -1906,7 +1919,9 @@ const Confirmacion=({confirm,setConfirm,vols,setVols,centros,setPage})=>{
                       style={{width:"100%",minWidth:150,border:`1.5px solid ${C.grayBorder}`,borderRadius:8,padding:"7px 10px",fontSize:12.5,outline:"none",color:C.dark,boxSizing:"border-box"}}/>
                   </td>
                   <td style={{padding:"10px 8px",whiteSpace:"nowrap"}}>
-                    <button onClick={()=>validar(row)} style={{border:`1.5px solid ${C.primary}`,background:C.primary,color:C.white,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:11.5,fontWeight:700,whiteSpace:"nowrap"}}>Validar</button>
+                    {row.validado
+                      ? <span title="Ya se contabilizaron las horas/faltas de esta semana" style={{border:`1.5px solid ${C.green}`,background:C.greenPale,color:C.green,borderRadius:8,padding:"5px 10px",fontSize:11.5,fontWeight:700,display:"inline-block"}}>✅ Validada</span>
+                      : <button onClick={()=>validar(row)} style={{border:`1.5px solid ${C.primary}`,background:C.primary,color:C.white,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:11.5,fontWeight:700,whiteSpace:"nowrap"}}>Validar</button>}
                     {" "}
                     <button onClick={()=>delRow(row.id)} title="Quitar registro" style={{border:`1.5px solid ${C.red}`,background:"transparent",color:C.red,borderRadius:8,padding:"5px 8px",cursor:"pointer",fontSize:12}}>🗑️</button>
                   </td>
@@ -1945,9 +1960,13 @@ const ConfirmacionVol=({confirm,setConfirm,vols,auth,setPage})=>{
   const [weekOffset,setWeekOffset]=useState(0);
   const monday=getMonday(weekOffset);
   const sunday=new Date(monday.getTime()+6*86400000);
+  const semanaKey=ymd(monday); // semana que se está viendo ahora
+  const hoyKey=ymd(getMonday(0)); // semana real de hoy, para registros viejos sin etiqueta de semana
 
   const vol=vols.find(v=>v.id===auth.volId);
-  const misRows=confirm.filter(r=>r.volId===auth.volId);
+  // Solo MI disponibilidad de la semana que estoy viendo. Lo de semanas pasadas no se mezcla
+  // ni se repite acá: cada semana nueva arranca en blanco y hay que volver a marcar los días.
+  const misRows=confirm.filter(r=>r.volId===auth.volId&&(r.semana||hoyKey)===semanaKey);
 
   // El voluntario marca su disponibilidad: alterna "" ↔ "confirmado".
   // Si coordinación ya marcó ✓ o F, ese día queda bloqueado.
@@ -1960,7 +1979,7 @@ const ConfirmacionVol=({confirm,setConfirm,vols,auth,setPage})=>{
   const setBloque=(id,b)=>setConfirm(confirm.map(r=>r.id===id?{...r,bloque:b}:r));
   const addDisp=()=>{
     if(!auth.volId){window.alert("Tu usuario no está vinculado a una ficha de voluntario. Comunícate con coordinación.");return;}
-    setConfirm([...confirm,{id:uid(),volId:auth.volId,centro:"",bloque:"manana",dias:{},obs:""}]);
+    setConfirm([...confirm,{id:uid(),volId:auth.volId,centro:"",bloque:"manana",dias:{},obs:"",semana:semanaKey}]);
   };
   const delDisp=id=>{if(window.confirm("¿Quitar esta disponibilidad?"))setConfirm(confirm.filter(r=>r.id!==id));};
   const fechaCorta=i=>{const d=new Date(monday.getTime()+i*86400000);return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;};
@@ -2004,8 +2023,12 @@ const ConfirmacionVol=({confirm,setConfirm,vols,auth,setPage})=>{
       {misRows.length===0&&(
         <Card style={{textAlign:"center",padding:40}}>
           <div style={{fontSize:40,marginBottom:10}}>📋</div>
-          <p style={{margin:"0 0 14px",color:C.gray}}>Aún no has registrado tu disponibilidad. Pulsa <b>➕ Añadir disponibilidad</b>, marca tus días y elige tu horario.</p>
-          <Btn color={C.green} onClick={addDisp}>➕ Añadir disponibilidad</Btn>
+          <p style={{margin:"0 0 14px",color:C.gray}}>
+            {weekOffset<0
+              ? "No registraste disponibilidad esa semana."
+              : <>Aún no has registrado tu disponibilidad de esta semana. Pulsa <b>➕ Añadir disponibilidad</b>, marca tus días y elige tu horario.</>}
+          </p>
+          {weekOffset>=0&&<Btn color={C.green} onClick={addDisp}>➕ Añadir disponibilidad</Btn>}
         </Card>
       )}
 

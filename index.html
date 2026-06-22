@@ -2432,110 +2432,47 @@ const SESSION_KEY="bd_session_v1";
 const SESSION_HOURS=4; // horas antes de que expire la sesión
 
 function applyDriveData(data,{setVols,setConfirm,setComunicados,setActs,setAceptaciones,setDocsPolitica,setActTipos,setTareas,setCentros,setPassAdmin,setPassVoluntario,setPassMeta}){
-  if(Array.isArray(data.vols)&&data.vols.length)setVols(data.vols);
-  if(Array.isArray(data.confirm)&&data.confirm.length)setConfirm(data.confirm);
-  if(Array.isArray(data.comunicados)&&data.comunicados.length)setComunicados(data.comunicados);
-  if(Array.isArray(data.acts)&&data.acts.length)setActs(data.acts);
+  // OJO: antes esto exigía además "&&data.vols.length" (etc.), lo que hacía que un array
+  // VACÍO PERO REAL (ej. borraste todas las confirmaciones a propósito) nunca se aceptara
+  // y la app se quedara mostrando datos viejos. Ahora basta con que el campo esté presente
+  // como array (Array.isArray), sea o no esté vacío; solo se ignora si el campo NO vino.
+  if(Array.isArray(data.vols))setVols(data.vols);
+  if(Array.isArray(data.confirm))setConfirm(data.confirm);
+  if(Array.isArray(data.comunicados))setComunicados(data.comunicados);
+  if(Array.isArray(data.acts))setActs(data.acts);
   if(data.aceptaciones&&typeof data.aceptaciones==="object")setAceptaciones(data.aceptaciones);
   if(Array.isArray(data.docsPolitica))setDocsPolitica(data.docsPolitica);
-  if(Array.isArray(data.actTipos)&&data.actTipos.length)setActTipos(data.actTipos);
-  if(Array.isArray(data.tareas)&&data.tareas.length)setTareas(data.tareas);
-  if(Array.isArray(data.centros)&&data.centros.length)setCentros(data.centros);
+  if(Array.isArray(data.actTipos))setActTipos(data.actTipos);
+  if(Array.isArray(data.tareas))setTareas(data.tareas);
+  if(Array.isArray(data.centros))setCentros(data.centros);
   if(typeof data.passAdmin==="string"&&data.passAdmin)setPassAdmin(data.passAdmin);
   if(typeof data.passVoluntario==="string"&&data.passVoluntario)setPassVoluntario(data.passVoluntario);
   if(data.passMeta&&typeof data.passMeta==="object")setPassMeta(data.passMeta);
 }
 
-// ── Fusión a 3 bandas (base / remoto / local) para que dos personas puedan ─────
-// editar al mismo tiempo sin que la última en guardar borre lo de la otra.
-// "base" = lo que este navegador sabía que había en Drive antes de sus propios
-// cambios locales. Comparando cada registro contra esa base se puede saber
-// quién agregó, quién editó y quién borró, y combinar ambos lados sin pisar nada.
+// NOTA: la fusión a 3 bandas (base/remoto/local) ya NO se hace aquí en el navegador.
+// Ahora vive del lado del servidor (Code.gs), dentro de un candado de escritura
+// (LockService), para que "leer el estado real + fusionar + escribir" sea una
+// operación atómica y dos guardados casi simultáneos de personas distintas no
+// puedan pisarse entre sí. El navegador solo manda su "baseline" (lo último que
+// sabía que coincidía con Drive) y su "local" (lo que tiene editado), y el
+// servidor devuelve el resultado ya fusionado.
 
-// Combina dos listas de objetos identificados por una clave (por defecto "id").
-function mergeArrayById(base,remote,local,keyField){
-  keyField=keyField||"id";
-  const toMap=arr=>{const m=new Map();(Array.isArray(arr)?arr:[]).forEach(x=>{if(x&&x[keyField]!==undefined)m.set(x[keyField],x);});return m;};
-  const b=toMap(base),r=toMap(remote),l=toMap(local);
-  const ids=new Set([...b.keys(),...r.keys(),...l.keys()]);
-  const out=[];
-  ids.forEach(id=>{
-    const bi=b.get(id),ri=r.get(id),li=l.get(id);
-    const bStr=JSON.stringify(bi),rStr=JSON.stringify(ri),lStr=JSON.stringify(li);
-    const localChanged=lStr!==bStr,remoteChanged=rStr!==bStr;
-    if(li===undefined&&ri===undefined)return; // no existe en ninguno de los dos lados actuales
-    if(li===undefined){ // ya no está en local
-      if(!remoteChanged&&bi!==undefined)return; // lo borré yo y nadie lo tocó en Drive → respetar el borrado
-      out.push(ri); return; // es nuevo en Drive, o alguien lo editó mientras yo lo borraba → no perderlo
-    }
-    if(ri===undefined){ // ya no está en Drive
-      if(!localChanged&&bi!==undefined)return; // lo borraron en Drive y yo no lo toqué → respetar ese borrado
-      out.push(li); return; // es nuevo localmente, o yo lo edité mientras lo borraban en Drive → no perderlo
-    }
-    // existe en ambos lados
-    if(localChanged&&!remoteChanged)out.push(li);
-    else if(remoteChanged&&!localChanged)out.push(ri);
-    else if(localChanged&&remoteChanged)out.push(li); // mismo registro tocado por los dos casi a la vez (raro): gana quien guarda en este momento, pero no se pierde el resto de los cambios de nadie
-    else out.push(bi);
-  });
-  return out;
-}
-
-// Igual que arriba pero para objetos simples tipo mapa (ej. aceptaciones: {volId:{...}}).
-function mergeObjectByKey(base,remote,local){
-  const isObj=x=>x&&typeof x==="object"&&!Array.isArray(x);
-  const b=isObj(base)?base:{},r=isObj(remote)?remote:{},l=isObj(local)?local:{};
-  const keys=new Set([...Object.keys(b),...Object.keys(r),...Object.keys(l)]);
-  const out={};
-  keys.forEach(k=>{
-    const inB=k in b,inR=k in r,inL=k in l;
-    const bStr=JSON.stringify(b[k]),rStr=JSON.stringify(r[k]),lStr=JSON.stringify(l[k]);
-    const localChanged=lStr!==bStr,remoteChanged=rStr!==bStr;
-    if(!inL&&!inR)return;
-    if(!inL){ if(!remoteChanged&&inB)return; out[k]=r[k]; return; }
-    if(!inR){ if(!localChanged&&inB)return; out[k]=l[k]; return; }
-    out[k]=localChanged?l[k]:r[k];
-  });
-  return out;
-}
-
-// Para valores sueltos (contraseñas, metadatos): si lo cambié yo localmente, gana mi cambio; si no, lo último que haya en Drive.
-function mergeScalar(base,remote,local){
-  return JSON.stringify(local)!==JSON.stringify(base)?local:remote;
-}
-
-// Arma el objeto final a subir a Drive fusionando cada colección por separado.
-function buildMergedPayload(base,remote,local){
-  base=base||{};remote=remote||{};local=local||{};
-  return {
-    vols:mergeArrayById(base.vols,remote.vols,local.vols),
-    confirm:mergeArrayById(base.confirm,remote.confirm,local.confirm),
-    comunicados:mergeArrayById(base.comunicados,remote.comunicados,local.comunicados),
-    acts:mergeArrayById(base.acts,remote.acts,local.acts),
-    tareas:mergeArrayById(base.tareas,remote.tareas,local.tareas),
-    centros:mergeArrayById(base.centros,remote.centros,local.centros),
-    docsPolitica:mergeArrayById(base.docsPolitica,remote.docsPolitica,local.docsPolitica),
-    actTipos:mergeArrayById(base.actTipos,remote.actTipos,local.actTipos,"value"),
-    aceptaciones:mergeObjectByKey(base.aceptaciones,remote.aceptaciones,local.aceptaciones),
-    passAdmin:mergeScalar(base.passAdmin,remote.passAdmin,local.passAdmin),
-    passVoluntario:mergeScalar(base.passVoluntario,remote.passVoluntario,local.passVoluntario),
-    passMeta:mergeScalar(base.passMeta,remote.passMeta,local.passMeta),
-  };
-}
-
-// Actualiza la "base" conocida cuando llegan datos de una carga normal desde Drive
-// (misma lógica condicional que applyDriveData, para no inventar una base con campos vacíos).
+// Actualiza la "base" conocida cuando llegan datos de una carga normal desde Drive.
+// OJO: antes esto exigía "&&data.vols.length" (etc.), lo que hacía que un array
+// VACÍO PERO REAL nunca se aceptara como base válida. Ahora basta con que el
+// campo esté presente como array, esté vacío o no.
 function mergeBaselineFromLoad(baseline,data){
   const out={...(baseline||{})};
-  if(Array.isArray(data.vols)&&data.vols.length)out.vols=data.vols;
-  if(Array.isArray(data.confirm)&&data.confirm.length)out.confirm=data.confirm;
-  if(Array.isArray(data.comunicados)&&data.comunicados.length)out.comunicados=data.comunicados;
-  if(Array.isArray(data.acts)&&data.acts.length)out.acts=data.acts;
+  if(Array.isArray(data.vols))out.vols=data.vols;
+  if(Array.isArray(data.confirm))out.confirm=data.confirm;
+  if(Array.isArray(data.comunicados))out.comunicados=data.comunicados;
+  if(Array.isArray(data.acts))out.acts=data.acts;
   if(data.aceptaciones&&typeof data.aceptaciones==="object")out.aceptaciones=data.aceptaciones;
   if(Array.isArray(data.docsPolitica))out.docsPolitica=data.docsPolitica;
-  if(Array.isArray(data.actTipos)&&data.actTipos.length)out.actTipos=data.actTipos;
-  if(Array.isArray(data.tareas)&&data.tareas.length)out.tareas=data.tareas;
-  if(Array.isArray(data.centros)&&data.centros.length)out.centros=data.centros;
+  if(Array.isArray(data.actTipos))out.actTipos=data.actTipos;
+  if(Array.isArray(data.tareas))out.tareas=data.tareas;
+  if(Array.isArray(data.centros))out.centros=data.centros;
   if(typeof data.passAdmin==="string"&&data.passAdmin)out.passAdmin=data.passAdmin;
   if(typeof data.passVoluntario==="string"&&data.passVoluntario)out.passVoluntario=data.passVoluntario;
   if(data.passMeta&&typeof data.passMeta==="object")out.passMeta=data.passMeta;
@@ -2557,6 +2494,24 @@ function applyMergedToState(merged,{setVols,setConfirm,setComunicados,setActs,se
   if(merged.passAdmin)setPassAdmin(merged.passAdmin);
   if(merged.passVoluntario)setPassVoluntario(merged.passVoluntario);
   if(merged.passMeta)setPassMeta(merged.passMeta);
+}
+
+// Manda lo que tengo (baseline + local) al backend, que ahora es quien lee el
+// estado real, fusiona y escribe de forma atómica (con candado), y devuelve el
+// resultado. Valida la respuesta a fondo: un guardado NUNCA se considera
+// exitoso si el servidor no confirmó explícitamente {status:"ok"} con un JSON
+// válido — así no hay forma de que un error 500 o una página HTML de Apps
+// Script se confunda con un guardado exitoso (esto fue el bug #1 original).
+async function saveToDrive(baseline,local){
+  const r=await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({baseline,local})});
+  if(!r.ok)throw new Error("El servidor respondió con error HTTP "+r.status);
+  let result;
+  try{ result=await r.json(); }
+  catch(parseErr){ throw new Error("Respuesta del servidor no es JSON válido (posible error de Apps Script)"); }
+  if(!result||result.status!=="ok")throw new Error((result&&result.message)||"El servidor rechazó el guardado");
+  if(!result.merged||typeof result.merged!=="object")throw new Error("El servidor no devolvió los datos fusionados");
+  return result.merged;
 }
 
 function App(){
@@ -2613,7 +2568,8 @@ function App(){
     if(!SHEETS_URL){dataLoaded.current=true;return;}
     try{
       const r=await fetch(SHEETS_URL+"?action=load&t="+Date.now());
-      const data=await r.json();
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      const data=await r.json(); // si Apps Script devolvió HTML de error, esto lanza y cae al catch (no se confunde con datos válidos)
       // Solo aplicar si NO hay un guardado pendiente para no pisar cambios propios
       if(!pendingSave.current&&!saving.current){
         skipSaveEffect.current=true; // lo que vamos a aplicar viene de Drive, no es un cambio del usuario
@@ -2664,11 +2620,7 @@ function App(){
     setSyncMsg("Reintentando guardado…");
     setSaveError(false);
     try{
-      const r=await fetch(SHEETS_URL+"?action=load&t="+Date.now());
-      const remote=await r.json();
-      const merged=buildMergedPayload(baselineRef.current,remote,stateRef.current);
-      await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-        body:JSON.stringify(merged)});
+      const merged=await saveToDrive(baselineRef.current,stateRef.current);
       baselineRef.current=merged; // ya coincide con lo que quedó guardado en Drive
       skipSaveEffect.current=true; // lo que vamos a reflejar es el resultado del guardado, no una edición nueva
       applyMergedToState(merged,setters); // por si alguien más agregó/editó algo mientras guardábamos
@@ -2695,11 +2647,7 @@ function App(){
       saving.current=true;
       setSyncMsg("Guardando…");
       try{
-        const r=await fetch(SHEETS_URL+"?action=load&t="+Date.now());
-        const remote=await r.json();
-        const merged=buildMergedPayload(baselineRef.current,remote,stateRef.current);
-        await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-          body:JSON.stringify(merged)});
+        const merged=await saveToDrive(baselineRef.current,stateRef.current);
         baselineRef.current=merged; // ya coincide con lo que quedó guardado en Drive
         skipSaveEffect.current=true; // lo que vamos a reflejar es el resultado del guardado, no una edición nueva
         applyMergedToState(merged,setters); // por si alguien más agregó/editó algo mientras guardábamos

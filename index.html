@@ -2810,9 +2810,32 @@ function applyMergedToState(merged,{setVols,setConfirm,setComunicados,setActs,se
 // exitoso si el servidor no confirmó explícitamente {status:"ok"} con un JSON
 // válido — así no hay forma de que un error 500 o una página HTML de Apps
 // Script se confunda con un guardado exitoso (esto fue el bug #1 original).
+// Compara si dos valores son funcionalmente iguales para decidir si enviarlos.
+const _jsonEq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+
+// Envía SOLO las colecciones que realmente cambiaron desde la última vez que
+// se sincronizó con Drive (baseline). Esto reduce el payload de ~400KB a unos
+// pocos KB en la mayoría de los casos (ej. un voluntario marcando un día).
 async function saveToDrive(baseline,local){
-  const r=await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({baseline,local})});
+  // Construir payload mínimo
+  const ARRAY_KEYS=["vols","confirm","comunicados","acts","tareas","centros","docsPolitica","actTipos"];
+  const OBJ_KEYS  =["aceptaciones","passMeta"];
+  const STR_KEYS  =["passAdmin","passVoluntario"];
+  const changedBaseline={}, changedLocal={};
+  let nChanged=0;
+  [...ARRAY_KEYS,...OBJ_KEYS,...STR_KEYS].forEach(k=>{
+    if(!_jsonEq(local[k],baseline[k])){
+      changedBaseline[k]=baseline[k];
+      changedLocal[k]=local[k];
+      nChanged++;
+    }
+  });
+  // Si absolutamente nada cambió, no hace falta guardar
+  if(nChanged===0)return baseline;
+
+  const r=await fetch(SHEETS_URL,{method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({baseline:changedBaseline,local:changedLocal})});
   if(!r.ok)throw new Error("El servidor respondió con error HTTP "+r.status);
   let result;
   try{ result=await r.json(); }
@@ -2938,14 +2961,16 @@ function App(){
     setSaveError(false);
     try{
       const merged=await saveToDrive(baselineRef.current,stateRef.current);
-      baselineRef.current=merged; // ya coincide con lo que quedó guardado en Drive
-      skipSaveEffect.current=true; // lo que vamos a reflejar es el resultado del guardado, no una edición nueva
-      applyMergedToState(merged,setters); // por si alguien más agregó/editó algo mientras guardábamos
-      setSyncOk(true);setSyncMsg("Guardado en Drive");
+      baselineRef.current=merged;
+      if(!_jsonEq(merged,stateRef.current)){
+        skipSaveEffect.current=true;
+        applyMergedToState(merged,setters);
+      }
+      setSyncOk(true);setSyncMsg("✓ Guardado");
       pendingSave.current=false;
       setSaveError(false);
     }catch(e){
-      setSyncOk(false);setSyncMsg("Error al guardar (modo local)");
+      setSyncOk(false);setSyncMsg("Sin conexión — reintenta");
       setSaveError(true);
     }finally{saving.current=false;}
   };
@@ -2958,23 +2983,29 @@ function App(){
     if(skipSaveEffect.current){skipSaveEffect.current=false;return;} // este cambio de estado vino de aplicar datos de Drive, no de una edición del usuario: no hay nada que volver a guardar
     pendingSave.current=true;
     setSaveError(false);
+    setSyncMsg("Cambio pendiente…"); // indicador inmediato sin esperar el debounce
     if(saveRef.current)clearTimeout(saveRef.current);
     saveRef.current=setTimeout(async()=>{
       saving.current=true;
-      setSyncMsg("Guardando…");
+      setSyncMsg("Guardando en Drive…");
       try{
         const merged=await saveToDrive(baselineRef.current,stateRef.current);
         baselineRef.current=merged; // ya coincide con lo que quedó guardado en Drive
-        skipSaveEffect.current=true; // lo que vamos a reflejar es el resultado del guardado, no una edición nueva
-        applyMergedToState(merged,setters); // por si alguien más agregó/editó algo mientras guardábamos
-        setSyncOk(true);setSyncMsg("Guardado en Drive");
+        // Solo actualizar el estado visual si el merge trajo cambios de otros usuarios.
+        // Si el resultado es idéntico a lo local actual, salteamos el setState para
+        // evitar un re-render y el consumo del skipSaveEffect sin necesidad.
+        if(!_jsonEq(merged,stateRef.current)){
+          skipSaveEffect.current=true;
+          applyMergedToState(merged,setters);
+        }
+        setSyncOk(true);setSyncMsg("✓ Guardado");
         pendingSave.current=false;
         setSaveError(false);
       }catch(e){
-        setSyncOk(false);setSyncMsg("Error al guardar — cambios NO guardados");
+        setSyncOk(false);setSyncMsg("Sin conexión — reintenta");
         setSaveError(true);
       }finally{saving.current=false;}
-    },1200);
+    },800);
     return()=>{if(saveRef.current)clearTimeout(saveRef.current);};
   },[vols,confirm,comunicados,acts,tareas,centros,aceptaciones,docsPolitica,actTipos,passAdmin,passVoluntario,passMeta]);
 

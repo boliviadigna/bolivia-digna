@@ -2962,7 +2962,8 @@ function App(){
     try{
       const merged=await saveToDrive(baselineRef.current,stateRef.current);
       baselineRef.current=merged;
-      if(!_jsonEq(merged,stateRef.current)){
+      // No pisar cambios locales más nuevos que llegaron mientras reintentábamos
+      if(!pendingSave.current&&!_jsonEq(merged,stateRef.current)){
         skipSaveEffect.current=true;
         applyMergedToState(merged,setters);
       }
@@ -2979,22 +2980,33 @@ function App(){
   const saveRef=useRef(null);
   useEffect(()=>{
     if(!SHEETS_URL)return;
-    if(!dataLoaded.current)return; // 🔒 todavía no llegaron los datos reales de Drive: NO guardar (evita pisar todo con los datos de ejemplo iniciales)
-    if(skipSaveEffect.current){skipSaveEffect.current=false;return;} // este cambio de estado vino de aplicar datos de Drive, no de una edición del usuario: no hay nada que volver a guardar
+    if(!dataLoaded.current)return;
+    if(skipSaveEffect.current){skipSaveEffect.current=false;return;}
     pendingSave.current=true;
     setSaveError(false);
-    setSyncMsg("Cambio pendiente…"); // indicador inmediato sin esperar el debounce
+    setSyncMsg("Cambio pendiente…");
     if(saveRef.current)clearTimeout(saveRef.current);
-    saveRef.current=setTimeout(async()=>{
+
+    // executeSave se define aquí para poder auto-reeferenciarse en el finally
+    // (reintento cuando un guardado anterior aún estaba en progreso).
+    const executeSave=async()=>{
+      // ── Bug fix: evitar guardados simultáneos ──────────────────────────────
+      // Si hay un guardado en curso, salimos temprano. pendingSave queda en true,
+      // y el finally del guardado en curso va a disparar un reintento en 400ms.
+      if(saving.current){ pendingSave.current=true; return; }
+
       saving.current=true;
       setSyncMsg("Guardando en Drive…");
       try{
         const merged=await saveToDrive(baselineRef.current,stateRef.current);
-        baselineRef.current=merged; // ya coincide con lo que quedó guardado en Drive
-        // Solo actualizar el estado visual si el merge trajo cambios de otros usuarios.
-        // Si el resultado es idéntico a lo local actual, salteamos el setState para
-        // evitar un re-render y el consumo del skipSaveEffect sin necesidad.
-        if(!_jsonEq(merged,stateRef.current)){
+        baselineRef.current=merged;
+
+        // ── Bug fix: no pisar cambios locales más nuevos ───────────────────
+        // stateRef.current pudo cambiar DURANTE el await (el usuario siguió
+        // editando). Si hay cambios nuevos pendientes, no aplicamos el merged
+        // al estado visual — eso pisaría esos cambios. El próximo guardado
+        // (que se auto-dispara desde el finally abajo) los incluirá.
+        if(!pendingSave.current&&!_jsonEq(merged,stateRef.current)){
           skipSaveEffect.current=true;
           applyMergedToState(merged,setters);
         }
@@ -3004,8 +3016,18 @@ function App(){
       }catch(e){
         setSyncOk(false);setSyncMsg("Sin conexión — reintenta");
         setSaveError(true);
-      }finally{saving.current=false;}
-    },800);
+      }finally{
+        saving.current=false;
+        // ── Auto-reintento si llegaron cambios mientras guardábamos ────────
+        // (pendingSave volvió a true porque el usuario editó durante el await)
+        if(pendingSave.current){
+          if(saveRef.current)clearTimeout(saveRef.current);
+          saveRef.current=setTimeout(executeSave,400);
+        }
+      }
+    };
+
+    saveRef.current=setTimeout(executeSave,800);
     return()=>{if(saveRef.current)clearTimeout(saveRef.current);};
   },[vols,confirm,comunicados,acts,tareas,centros,aceptaciones,docsPolitica,actTipos,passAdmin,passVoluntario,passMeta]);
 

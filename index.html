@@ -596,14 +596,82 @@ const SidebarDesktop=({current,setCurrent,collapsed,setCollapsed,navGroups,auth,
 );
 
 // ── Barra de navegación inferior (mobile) ─────────────────────────────────────
-// Muestra hasta 5 ítems del menú del voluntario como íconos grandes.
-// El ítem activo se resalta; toca el ícono para cambiar de sección.
+// Muestra los 4 apartados más usados + botón "Más" que abre un cajón con TODOS.
 const BottomNav=({current,setCurrent,navGroups,onLogout})=>{
+  const [drawerOpen,setDrawerOpen]=React.useState(false);
   const allItems=(navGroups||NAV_GROUPS).flatMap(g=>g.items);
-  // Si hay más de 5, reservamos el último slot para "Salir" y usamos 4 ítems de nav
-  const maxNav=allItems.length<=5?allItems.length:4;
-  const navItems=allItems.slice(0,maxNav);
-  return(
+
+  // Los 4 fijos más importantes para el voluntario (siempre visibles)
+  const PRIORITY=["dashboard","confirmacion","comunicados","actividades"];
+  const pinned=PRIORITY
+    .map(id=>allItems.find(i=>i.id===id))
+    .filter(Boolean);
+
+  const navItemStyle=(id)=>({
+    flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+    gap:3,padding:"10px 4px 8px",border:"none",cursor:"pointer",
+    background:current===id?"rgba(255,255,255,0.18)":"transparent",
+    color:current===id?C.white:"rgba(255,255,255,0.65)",
+    borderTop:current===id?`3px solid ${C.white}`:"3px solid transparent",
+    transition:"all .15s",minWidth:0,
+    WebkitTapHighlightColor:"transparent",touchAction:"manipulation",
+  });
+
+  return(<>
+    {/* Cajón de menú completo */}
+    {drawerOpen&&(
+      <div onClick={()=>setDrawerOpen(false)}
+        style={{position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,0.5)"}}>
+        <div onClick={e=>e.stopPropagation()} style={{
+          position:"absolute",bottom:0,left:0,right:0,
+          background:C.white,borderRadius:"20px 20px 0 0",
+          paddingBottom:"calc(env(safe-area-inset-bottom,0px) + 72px)",
+          maxHeight:"80vh",overflowY:"auto",
+          boxShadow:"0 -8px 32px rgba(0,0,0,0.2)",
+        }}>
+          {/* Drag handle */}
+          <div style={{width:40,height:4,background:C.grayBorder,borderRadius:4,margin:"14px auto 8px"}}/>
+          <div style={{padding:"0 16px 8px",fontSize:11,fontWeight:700,letterSpacing:1.2,
+            color:C.gray,textTransform:"uppercase"}}>Todos los apartados</div>
+
+          {(navGroups||NAV_GROUPS).map(g=>(g.items.length===0?null:
+            <div key={g.grupo}>
+              <div style={{padding:"6px 16px 4px",fontSize:10.5,fontWeight:700,
+                color:C.subHeader||C.gray,letterSpacing:0.8,textTransform:"uppercase",
+                background:"#f4f8fb",borderTop:`1px solid ${C.grayBorder}`}}>{g.grupo}</div>
+              {g.items.map(n=>(
+                <button key={n.id} onClick={()=>{setCurrent(n.id);setDrawerOpen(false);}} style={{
+                  width:"100%",display:"flex",alignItems:"center",gap:14,
+                  padding:"14px 20px",border:"none",cursor:"pointer",
+                  background:current===n.id?C.cardBg:"transparent",
+                  borderLeft:current===n.id?`4px solid ${C.primary}`:"4px solid transparent",
+                  WebkitTapHighlightColor:"transparent",touchAction:"manipulation",
+                }}>
+                  <span style={{fontSize:22,width:28,textAlign:"center"}}>{n.icon}</span>
+                  <span style={{fontSize:15,fontWeight:current===n.id?700:500,
+                    color:current===n.id?C.primary:C.dark}}>{n.label}</span>
+                  {current===n.id&&<span style={{marginLeft:"auto",color:C.primary,fontSize:16}}>✓</span>}
+                </button>
+              ))}
+            </div>
+          ))}
+
+          {/* Botón salir al final del cajón */}
+          <button onClick={onLogout} style={{
+            width:"100%",display:"flex",alignItems:"center",gap:14,
+            padding:"14px 20px",border:"none",cursor:"pointer",
+            background:"transparent",
+            borderTop:`1px solid ${C.grayBorder}`,
+            WebkitTapHighlightColor:"transparent",touchAction:"manipulation",
+          }}>
+            <span style={{fontSize:22,width:28,textAlign:"center"}}>🚪</span>
+            <span style={{fontSize:15,fontWeight:500,color:C.red}}>Cerrar sesión</span>
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* Barra inferior fija */}
     <div style={{
       position:"fixed",bottom:0,left:0,right:0,zIndex:200,
       background:`linear-gradient(180deg,${C.primary} 0%,#0d2240 100%)`,
@@ -612,36 +680,31 @@ const BottomNav=({current,setCurrent,navGroups,onLogout})=>{
       borderTop:"1px solid rgba(255,255,255,0.12)",
       paddingBottom:"env(safe-area-inset-bottom,0px)",
     }}>
-      {navItems.map(n=>(
-        <button key={n.id} onClick={()=>setCurrent(n.id)} style={{
-          flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-          gap:3,padding:"10px 4px 8px",border:"none",cursor:"pointer",
-          background:current===n.id?"rgba(255,255,255,0.18)":"transparent",
-          color:current===n.id?C.white:"rgba(255,255,255,0.6)",
-          borderTop:current===n.id?`3px solid ${C.white}`:"3px solid transparent",
-          transition:"all .15s",minWidth:0,
-          WebkitTapHighlightColor:"transparent",touchAction:"manipulation",
-        }}>
+      {pinned.map(n=>(
+        <button key={n.id} onClick={()=>{setCurrent(n.id);setDrawerOpen(false);}}
+          style={navItemStyle(n.id)}>
           <span style={{fontSize:22}}>{n.icon}</span>
-          <span style={{fontSize:9.5,fontWeight:current===n.id?700:500,letterSpacing:0.3,lineHeight:1,
+          <span style={{fontSize:9,fontWeight:current===n.id?700:500,letterSpacing:0.2,lineHeight:1,
             overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%",padding:"0 2px"}}>
-            {n.label}
+            {n.label.split("·")[0].trim()}
           </span>
         </button>
       ))}
-      {/* Botón salir siempre al final */}
-      <button onClick={onLogout} style={{
-        width:44,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-        gap:3,padding:"10px 4px 8px",border:"none",cursor:"pointer",background:"transparent",
-        color:"rgba(255,255,255,0.5)",borderTop:"3px solid transparent",
-        borderLeft:"1px solid rgba(255,255,255,0.12)",
+      {/* Botón "Más" que abre el cajón */}
+      <button onClick={()=>setDrawerOpen(o=>!o)} style={{
+        flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+        gap:3,padding:"10px 4px 8px",border:"none",cursor:"pointer",
+        background:drawerOpen?"rgba(255,255,255,0.18)":"transparent",
+        color:drawerOpen?C.white:"rgba(255,255,255,0.65)",
+        borderTop:drawerOpen?`3px solid ${C.white}`:"3px solid transparent",
+        transition:"all .15s",minWidth:0,
         WebkitTapHighlightColor:"transparent",touchAction:"manipulation",
       }}>
-        <span style={{fontSize:18}}>🚪</span>
-        <span style={{fontSize:9,fontWeight:500}}>Salir</span>
+        <span style={{fontSize:22}}>{drawerOpen?"✕":"☰"}</span>
+        <span style={{fontSize:9,fontWeight:500,lineHeight:1}}>Más</span>
       </button>
     </div>
-  );
+  </>);
 };
 
 // Wrapper que elige entre SidebarDesktop y BottomNav según el dispositivo
